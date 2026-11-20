@@ -705,6 +705,17 @@
       if (blocksDeco) decoBlocked[ty][tx] = true;
     }
 
+    function farFromPlaced(tx, ty, minDist) {
+      var lim = minDist * minDist;
+      for (var i = 0; i < scenery.length; i += 1) {
+        var o = scenery[i];
+        var dx = o.x - tx;
+        var dy = o.y - ty;
+        if (dx * dx + dy * dy < lim) return false;
+      }
+      return true;
+    }
+
     var treeAssets = ['tree1', 'tree2', 'tree3', 'round', 'round2', 'long', 'pine'];
     var bushAssets = ['bush1', 'bush3', 'bush4', 'hedge'];
     var treeCount = 0;
@@ -714,6 +725,7 @@
       var tx = Math.floor(rand() * COLS);
       var ty = Math.floor(rand() * ROWS);
       if (!canPlace(tx, ty)) continue;
+      if (!farFromPlaced(tx, ty, 2.25)) continue;
       var asset;
       if (nearPath(tx, ty, 2)) asset = 'palm';
       else if (ty < 14) asset = rand() < 0.5 ? 'pine' : 'tree2';
@@ -729,6 +741,7 @@
       var rx2 = Math.floor(rand() * COLS);
       var ry2 = Math.floor(rand() * ROWS);
       if (!canPlace(rx2, ry2)) continue;
+      if (!farFromPlaced(rx2, ry2, 1.3)) continue;
       addScenery('rock', rx2, ry2, true, true);
       rockCount += 1;
     }
@@ -740,6 +753,7 @@
       var bx2 = Math.floor(rand() * COLS);
       var by2 = Math.floor(rand() * ROWS);
       if (!canPlace(bx2, by2)) continue;
+      if (!farFromPlaced(bx2, by2, 1.15)) continue;
       addScenery(bushAssets[Math.floor(rand() * bushAssets.length)], bx2, by2, true, true);
       bushCount += 1;
     }
@@ -751,6 +765,7 @@
       var lx = Math.floor(rand() * COLS);
       var ly = Math.floor(rand() * ROWS);
       if (!canPlace(lx, ly)) continue;
+      if (!farFromPlaced(lx, ly, 1.2)) continue;
       addScenery(logCount % 2 ? 'log' : 'stump', lx, ly, true, true);
       logCount += 1;
     }
@@ -762,6 +777,7 @@
       var fx = Math.floor(rand() * COLS);
       var fy = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(fx, fy, 0)) continue;
+      if (!farFromPlaced(fx, fy, 0.55)) continue;
       addScenery('flower', fx, fy, false, false);
       flowerCount += 1;
     }
@@ -773,6 +789,7 @@
       var gx = Math.floor(rand() * COLS);
       var gy = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(gx, gy, 0)) continue;
+      if (!farFromPlaced(gx, gy, 0.5)) continue;
       addScenery('grass', gx, gy, false, false);
       grassCount += 1;
     }
@@ -784,6 +801,7 @@
       var mx = Math.floor(rand() * COLS);
       var my = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(mx, my, 0)) continue;
+      if (!farFromPlaced(mx, my, 0.6)) continue;
       addScenery('mushroom', mx, my, false, false);
       mushroomCount += 1;
     }
@@ -795,6 +813,7 @@
       var fnx = Math.floor(rand() * COLS);
       var fny = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(fnx, fny, 0)) continue;
+      if (!farFromPlaced(fnx, fny, 0.6)) continue;
       addScenery('fern', fnx, fny, false, false);
       fernCount += 1;
     }
@@ -807,6 +826,7 @@
       var rdy = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(rdx, rdy, 0)) continue;
       if (dist2(rdx, rdy, 9, 15) > 9) continue;
+      if (!farFromPlaced(rdx, rdy, 0.55)) continue;
       addScenery('reed', rdx, rdy, false, false);
       reedCount += 1;
     }
@@ -819,6 +839,7 @@
       var pby = Math.floor(rand() * ROWS);
       if (!canPlaceSmall(pbx, pby, 0)) continue;
       if (!nearPath(pbx, pby, 1) && tiles[pby][pbx] !== 2) continue;
+      if (!farFromPlaced(pbx, pby, 0.4)) continue;
       addScenery('pebble', pbx, pby, false, false);
       pebbleCount += 1;
     }
@@ -2643,7 +2664,6 @@
       for (var ti = 0; ti < 8; ti += 1) {
         var tt = (ti - 3.5) / 4;
         parts.push(cyl(0.012 * h, 0.065 * h, 0.78 * h, 5, ti % 2 ? '#F7F5F2' : '#E8D8C0', tt * 0.34 * h, 0.48 * h + Math.abs(tt) * 0.04 * h, -0.30 * h, 0.55, tt * 0.5, tt * 0.65));
-        parts.push(sphere(0.038 * h, 6, ti % 2 ? '#F7C6D0' : gold, tt * 0.34 * h + tt * 0.12 * h, 0.78 * h + Math.abs(tt) * 0.04 * h, -0.42 * h));
       }
     } else if (formId === 'xuanwu') {
       for (var xi = 0; xi < 10; xi += 1) {
@@ -4097,11 +4117,22 @@
       if (THREE.sRGBEncoding) thumbRenderer.outputEncoding = THREE.sRGBEncoding;
     }
     var scene2 = new THREE.Scene();
-    var h = poly.height;
-    var target = new THREE.Vector3(0, h * 0.52, 0);
-    var cam = new THREE.PerspectiveCamera(27, 1, 0.05, 40);
-    cam.position.set(2.5, h * 0.64 + 1.1, 4.0);
-    cam.lookAt(target);
+    var features = buildAvatarFeatures(formId, poly.height);
+    var bounds = new THREE.Box3().setFromObject(poly.object);
+    if (features) bounds.expandByObject(features);
+    bounds.expandByPoint(new THREE.Vector3(-1.55, -0.18, -1.55));
+    bounds.expandByPoint(new THREE.Vector3(1.55, 0.02, 1.55));
+    var bsize = new THREE.Vector3();
+    var bcenter = new THREE.Vector3();
+    bounds.getSize(bsize);
+    bounds.getCenter(bcenter);
+    var maxDim = Math.max(bsize.x, bsize.y, bsize.z) || 1;
+    var fov = 28;
+    var distance = (maxDim * 0.5) / Math.tan(fov * Math.PI / 360) * 1.40;
+    var dir = new THREE.Vector3(0.62, 0.38, 1).normalize();
+    var cam = new THREE.PerspectiveCamera(fov, 1, 0.05, Math.max(50, distance * 4));
+    cam.position.copy(bcenter).add(dir.multiplyScalar(distance));
+    cam.lookAt(bcenter);
 
     scene2.add(new THREE.HemisphereLight(0xE8F4FF, 0x3A4A34, 0.95));
     var sun = new THREE.DirectionalLight(0xFFE9C8, 1.15);
@@ -4126,7 +4157,6 @@
     ring.position.y = 0.012;
     scene2.add(ring);
     scene2.add(poly.object);
-    var features = buildAvatarFeatures(formId, poly.height);
     if (features) scene2.add(features);
 
     thumbRenderer.render(scene2, cam);
