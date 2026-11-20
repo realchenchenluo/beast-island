@@ -1,4 +1,4 @@
-/* 变身岛 - 界面渲染与交互（v2 大世界版） */
+/* 万灵屿 - 界面渲染与交互（v2 大世界版） */
 (function () {
   'use strict';
 
@@ -1334,7 +1334,7 @@
         '</p>' +
         '<button type="button" class="btn danger wide" data-action="reset-save">重新开始</button></div>');
       html.push('<div class="panel"><div class="panel-title">关于</div>' +
-        '<p class="about-text">变身岛 v2.1 · 大世界探索、随机变身、属性克制、自动战斗、增益树与金币指定变身。<br>' +
+        '<p class="about-text">万灵屿 v3.0 · 大世界探索、随机变身、属性克制、自动战斗、增益树与金币指定变身。<br>' +
         '场景素材：Kenney（CC0）。全部内容离线运行，无需联网。</p></div>');
     }
 

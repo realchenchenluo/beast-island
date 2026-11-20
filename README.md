@@ -1,4 +1,4 @@
-# 变身岛（3D 大世界版）
+# 万灵屿（3D 大世界版）
 
 一个离线 H5 小工具：随机变身成各种生物，从一座只有祭坛的空岛开始，用战斗赚金币，逐步建设商店、农田、花园和小屋，再自由种出属于自己的 3D 小岛。
 
@@ -223,7 +223,7 @@ node "$HOME/.zcode/skills/minitool-zip-builder/scripts/audit_artifact.mjs" dist
 python tools/build_zip.py
 
 # 3. 再审计 zip 体积与结构
-node "$HOME/.zcode/skills/minitool-zip-builder/scripts/audit_artifact.mjs" 变身岛.zip
+node "$HOME/.zcode/skills/minitool-zip-builder/scripts/audit_artifact.mjs" 万灵屿.zip
 ```
 
 不要压缩外层文件夹，zip 解压后必须直接看到 `index.html`。体积提示只针对体积，内容审计以 dist/zip 的 PASS 为准。
@@ -232,7 +232,7 @@ node "$HOME/.zcode/skills/minitool-zip-builder/scripts/audit_artifact.mjs" 变�
 
 - 浏览器试玩：<https://realchenchenluo.github.io/beast-island/>
 - 这是纯 H5 试玩版，方便快速查看 3D 世界、全部 34 个形态、农田和 UI。浏览器里没有小工具的 Storage API，**存档只在当前会话，刷新会重新开始**。
-- 正式验收仍请使用 `变身岛.zip` 上传创服平台，再走模拟器和 Android / iOS 真机。
+- 正式验收仍请使用 `万灵屿.zip` 上传创服平台，再走模拟器和 Android / iOS 真机。
 
 ## 关于你提供的两个项目
 
@@ -249,9 +249,10 @@ node "$HOME/.zcode/skills/minitool-zip-builder/scripts/audit_artifact.mjs" 变�
 - `node --check`：业务 JS 全部通过。
 - 单元测试：
   - `node tests/core-storage.test.mjs`：**1751 条断言通过**（在空岛/解锁/种植测试之外，新增 3 种增益树、增益层数上限、指定变身价格与扣费、保底不被指定变身消耗、战意/铁壁/疾风对战力与技能概率的影响、战斗后消耗一层增益，以及原有存档/肥料/克制/保底/装备/转盘/高塔测试）。
-  - `node tests/poly-models.test.mjs`：**12601 条断言通过**（新增增益树数据/3D 农田渲染/指定变身面板/增益面板断言，以及 18 个 PFM1 + 11 个 PFM2 模型、12 张贴图、34 个形态映射、34 张英雄图逐像素 QA、神话特征、授权）。
-- 容器审计：`audit_artifact.mjs dist` **PASS，88 个文件，0 warning**；最终 `变身岛.zip` 为 **2,646,480 字节（2.52 MiB）**，88 个文件，根目录 `index.html`，zip 审计 PASS，仅 1 条体积提示（建议 2 MiB，硬上限 10 MiB）。
+  - `node tests/poly-models.test.mjs`：**12608 条断言通过**（新增万灵屿标题/清晰 DOM 标签/增益树数据/3D 农田渲染/指定变身面板/增益面板断言，以及 18 个 PFM1 + 11 个 PFM2 模型、12 张贴图、34 个形态映射、34 张英雄图逐像素 QA、神话特征、授权）。
+- 容器审计：`audit_artifact.mjs dist` **PASS，88 个文件，0 warning**；最终 `万灵屿.zip` 为 **2,647,627 字节（2.52 MiB）**，88 个文件，根目录 `index.html`，zip 审计 PASS，仅 1 条体积提示（建议 2 MiB，硬上限 10 MiB）。
 - 本地浏览器冒烟（Chrome，非小工具验收）：新存档只有祭坛/土路/草地/工地，快捷栏初始为战斗/建设/背包；首访 6 步引导；未解锁时点种植、农田、装饰都会进入对应建设卡片；从建设页逐个解锁 6 项后，快捷栏扩展到 8 个、商店/农田/小屋模型重新出现；花园抽中草簇后点草地成功种下并可拔除；农田入口、种田/浇水/施肥/铲除/离开、商店、图鉴、高塔、装饰、战斗/转盘均无 JS 异常；战意/铁壁/疾风树可在 3D 农田种下、浇水、成熟后收获并立即获得增益层数，进入战斗准备页显示增益，打完一场后各扣一层；指定变身面板展示 34 个形态与 2,000–200,000 金币价格，二次确认后正确扣费、更新形态/图鉴/记录，且不改变随机保底。
+- 手机文字清晰度：头顶称号和建筑/预留地标签不再用 3D 文字贴图，改为按相机投影的 HTML 标签，12px 字号并由浏览器原生渲染，不再随 3D 纹理缩放发糊；初始兔子等角色整体抬高到路面之上，并把硬边圆形阴影换成柔和径向阴影，避免脚掌陷进土路。
 - 34/34 形态仍有 3D 实体，战斗/备战/结果/图鉴使用 34 张 3D 英雄渲染图；本轮只改岛屿生产与植被/地面视觉，动物模型资产未变。
 - **未实测**：Chrome 61 / Android 8.1 WebView、iOS 18.4 真机、创服平台模拟器；3D 帧率、触控手感、模型 PNG 解码耗时、农田面板在真机的小屏布局和真机性能未实测。
 

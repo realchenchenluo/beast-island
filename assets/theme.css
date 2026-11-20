@@ -1,4 +1,4 @@
-/* 变身岛 · 墨金主题（覆盖层，加载于 style.css 之后） */
+/* 万灵屿 · 墨金主题（覆盖层，加载于 style.css 之后） */
 :root {
   --bg: #0C1015;
   --ink: #E9E1D2;
@@ -929,3 +929,64 @@ body.is-in-farm .world-right { display: none; }
 .transform-confirm-note { margin-top: 12px; font-size: 10px; line-height: 1.75; color: #B4AA9A; }
 .transform-confirm-note b { color: var(--gold); }
 .transform-choice::-webkit-scrollbar { display: none; }
+
+
+/* ---------- 世界内清晰 DOM 标签（替代 3D 文字精灵） ---------- */
+.world-labels {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  pointer-events: none;
+  overflow: hidden;
+}
+.world-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: none;
+  max-width: 176px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(10, 14, 18, 0.82);
+  color: #F1E8D8;
+  border: 1px solid rgba(214, 177, 111, 0.42);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.38);
+  transform: translate(-50%, -100%);
+  will-change: transform;
+}
+.world-label.building {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 250, 238, 0.94);
+  color: #3A3028;
+  border-color: rgba(169, 113, 66, 0.85);
+}
+.world-label.building.is-locked {
+  background: rgba(12, 18, 23, 0.88);
+  color: #EAD9B4;
+  border-color: rgba(122, 90, 50, 0.9);
+}
+.world-label.avatar { font-size: 12px; }
+.world-label.avatar::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: #5FB86F;
+}
+.world-label.avatar[data-element="sky"]::before { background: #4FA8E8; }
+.world-label.avatar[data-element="water"]::before { background: #3FA9D6; }
+.world-label.avatar[data-element="spirit"]::before { background: #B97AD9; }

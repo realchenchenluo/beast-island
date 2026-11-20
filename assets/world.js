@@ -1,4 +1,4 @@
-/* 变身岛 - 3D 大世界引擎（three.js r120 / WebGL1 / Chrome 61 基线） */
+/* 万灵屿 - 3D 大世界引擎（three.js r120 / WebGL1 / Chrome 61 基线） */
 (function () {
   'use strict';
 
@@ -136,6 +136,7 @@
   var lastNearCheck = 0;
   var lastMinimap = 0;
   var lastPlace = 0;
+  var lastLabelUpdate = 0;
   var dirty = false;
   var nearby = null;
   var lastInteractLabel = '';
@@ -1484,27 +1485,78 @@
     b.labelY = 3.6;
   }
 
+  function setupWorldLabels() {
+    refs.labelLayer = document.getElementById('world-labels');
+    if (!refs.labelLayer) return;
+    refs.labelLayer.innerHTML = '';
+    refs.avatarLabel = document.createElement('div');
+    refs.avatarLabel.className = 'world-label avatar';
+    refs.avatarLabel.style.display = 'none';
+    refs.labelLayer.appendChild(refs.avatarLabel);
+    refs.labelLayer.style.display = '';
+  }
+
   function buildBuildingLabels() {
+    if (!refs.labelLayer) return;
+    var old = refs.labelLayer.querySelectorAll('.world-label.building');
+    for (var o = 0; o < old.length; o += 1) {
+      if (old[o].parentNode) old[o].parentNode.removeChild(old[o]);
+    }
+    buildingLabels.length = 0;
     for (var i = 0; i < map.buildings.length; i += 1) {
       var b = map.buildings[i];
       b.locked = !buildingUnlocked(b.type);
-      var sprite;
-      if (b.locked) {
-        sprite = makeTextSprite(b.name + ' · 可建设', {
-          bg: 'rgba(16,22,28,0.90)', color: '#EAD9B4', stroke: '#7A5A32', scaleX: 4.0, scaleY: 0.9
-        });
-      } else {
-        var shrineLabel = b.type === 'shrine';
-        sprite = makeTextSprite(b.name, {
-          bg: 'rgba(255,250,238,0.94)', color: '#3A3028', stroke: '#A97142',
-          scaleX: shrineLabel ? 4.4 : 3.2, scaleY: shrineLabel ? 1.05 : 0.8
-        });
+      var el = document.createElement('div');
+      el.className = 'world-label building' + (b.locked ? ' is-locked' : '');
+      el.textContent = b.locked ? (b.name + ' · 可建设') : b.name;
+      el.style.display = 'none';
+      refs.labelLayer.appendChild(el);
+      b.labelEl = el;
+      b.labelSprite = null;
+      buildingLabels.push({ el: el, b: b });
+    }
+  }
+
+  function updateWorldLabels() {
+    if (!initialized || !active || !refs.labelLayer || !camera || !canvas) return;
+    var cr = canvas.getBoundingClientRect();
+    if (cr.width < 4 || cr.height < 4) return;
+    var sr = refs.stage.getBoundingClientRect();
+    var camPos = camera.position;
+    var camDir = camera.getWorldDirection(new THREE.Vector3());
+    var vec = new THREE.Vector3();
+    var toPoint = new THREE.Vector3();
+    function place(el, x, y, z) {
+      vec.set(x, y, z);
+      var dist = vec.distanceTo(camPos);
+      toPoint.copy(vec).sub(camPos);
+      var behind = toPoint.dot(camDir) <= 0.1;
+      vec.project(camera);
+      if (vec.z > 1) behind = true;
+      var sx = (cr.left - sr.left) + (vec.x * 0.5 + 0.5) * cr.width;
+      var sy = (cr.top - sr.top) + (-vec.y * 0.5 + 0.5) * cr.height;
+      var show = !behind && dist < 62 &&
+        sx > -100 && sx < cr.width + 100 && sy > 38 && sy < cr.height - 132;
+      if (!show) {
+        if (el.style.display !== 'none') el.style.display = 'none';
+        return;
       }
-      if (!sprite) continue;
-      sprite.position.set(b.centerX, terrainHeightAt(b.centerX, b.centerZ) + b.labelY, b.centerZ);
-      scene.add(sprite);
-      b.labelSprite = sprite;
-      buildingLabels.push(sprite);
+      if (el.style.display !== 'block') el.style.display = 'block';
+      el.style.transform = 'translate(-50%,-100%) translate3d(' +
+        Math.round(sx) + 'px,' + Math.round(sy) + 'px,0)';
+    }
+    if (refs.avatarLabel && avatarGroup) {
+      place(
+        refs.avatarLabel,
+        avatarGroup.position.x,
+        avatarGroup.position.y + (avatarHolder ? avatarHolder.position.y : 0) + currentAvatarHeight + 0.55,
+        avatarGroup.position.z
+      );
+    }
+    for (var i = 0; i < buildingLabels.length; i += 1) {
+      var entry = buildingLabels[i];
+      var b = entry.b;
+      place(entry.el, b.centerX, terrainHeightAt(b.centerX, b.centerZ) + b.labelY, b.centerZ);
     }
   }
 
@@ -1537,11 +1589,7 @@
     buildingMeshes.length = 0;
     for (i = 0; i < buildingLabels.length; i += 1) {
       var label = buildingLabels[i];
-      scene.remove(label);
-      if (label.material) {
-        if (label.material.map) label.material.map.dispose();
-        label.material.dispose();
-      }
+      if (label.el && label.el.parentNode) label.el.parentNode.removeChild(label.el);
     }
     buildingLabels.length = 0;
     for (i = 0; i < map.buildings.length; i += 1) {
@@ -3279,15 +3327,9 @@
       avatarGlow.material.color.copy(sRGB(tier >= 5 ? 0xF2C94C : 0xBB6BD9));
       avatarGlow.scale.setScalar(poly ? shadowScale : height / 1.6);
     }
-    if (avatarNameSprite) {
-      avatarGroup.remove(avatarNameSprite);
-      if (avatarNameSprite.material.map) avatarNameSprite.material.map.dispose();
-      avatarNameSprite.material.dispose();
-    }
-    avatarNameSprite = makeAvatarName(creature.name, creature.element);
-    if (avatarNameSprite) {
-      avatarNameSprite.position.set(0, displayHeight + 0.9, 0);
-      avatarGroup.add(avatarNameSprite);
+    if (refs.avatarLabel) {
+      refs.avatarLabel.textContent = creature.name + ' · ' + window.Core.findElement(creature.element).name;
+      refs.avatarLabel.setAttribute('data-element', creature.element);
     }
     currentFormId = formId;
   }
@@ -3295,20 +3337,27 @@
   function createAvatar() {
     avatarGroup = new THREE.Group();
     avatarHolder = new THREE.Group();
+    avatarHolder.position.y = 0.065;
     avatarGroup.add(avatarHolder);
-    var shadowGeo = new THREE.CircleBufferGeometry(0.65, 18);
+    var shadowGeo = new THREE.PlaneBufferGeometry(1.72, 1.24);
     shadowGeo.rotateX(-Math.PI / 2);
     avatarShadow = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({
-      color: sRGB(0x1E3A2A), transparent: true, opacity: 0.26, depthWrite: false
+      map: getWorldTexture('scenery-shadow', drawShadowTexture),
+      transparent: true,
+      opacity: 0.58,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      side: THREE.DoubleSide
     }));
-    avatarShadow.position.y = 0.02;
+    avatarShadow.position.y = 0.058;
     avatarGroup.add(avatarShadow);
     var glowGeo = new THREE.RingBufferGeometry(0.72, 0.92, 24);
     glowGeo.rotateX(-Math.PI / 2);
     avatarGlow = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({
       color: sRGB(0xF2C94C), transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false
     }));
-    avatarGlow.position.y = 0.04;
+    avatarGlow.position.y = 0.065;
     avatarGlow.visible = false;
     avatarGroup.add(avatarGlow);
     scene.add(avatarGroup);
@@ -3351,6 +3400,7 @@
     renderer.setSize(viewW, viewH, false);
     camera.aspect = viewW / viewH;
     camera.updateProjectionMatrix();
+    if (initialized) updateWorldLabels();
   }
 
   function scheduleResize() {
@@ -3518,12 +3568,7 @@
     nearby = best;
     updateInteractButton();
     if (markerSprite) {
-      if (nearby && !decorateMode && !gardenMode && !inFarm) {
-        markerSprite.visible = true;
-        markerSprite.position.set(nearby.centerX, terrainHeightAt(nearby.centerX, nearby.centerZ) + nearby.labelY + 0.8, nearby.centerZ);
-      } else {
-        markerSprite.visible = false;
-      }
+      markerSprite.visible = false;
     }
     if (markerRing) {
       if (nearby && !decorateMode && !gardenMode && !inFarm) {
@@ -4279,7 +4324,7 @@
       avatarGroup.position.set(player.x, player.y, player.z);
       avatarGroup.rotation.y = player.angle;
       var bob = player.moving ? Math.sin(time * 9) * 0.04 : Math.sin(time * 2.2) * 0.02;
-      avatarHolder.position.y = bob;
+      avatarHolder.position.y = 0.065 + bob;
       if (avatarModel) {
         if (player.moving) {
           avatarModel.rotation.z = Math.sin(time * 8) * 0.03;
@@ -4338,6 +4383,10 @@
       }
     }
     updateAmbient(dt);
+    if (now - lastLabelUpdate > 70) {
+      lastLabelUpdate = now;
+      updateWorldLabels();
+    }
     if (sunMesh) sunMesh.rotation.y += dt * 0.02;
     for (var i = 0; i < clouds.length; i += 1) {
       clouds[i].position.x += dt * 0.08 * (i % 2 === 0 ? 1 : -1);
@@ -4714,6 +4763,7 @@
     camera.position.set(0, 8, 12);
 
     try {
+      setupWorldLabels();
       buildSky();
       map = generateMap();
       heightGrid = buildHeightGrid();
@@ -4763,6 +4813,8 @@
     syncFromState();
     scheduleResize();
     drawMinimap();
+    if (refs.labelLayer) refs.labelLayer.style.display = '';
+    updateWorldLabels();
     var st = window.Core.getState();
     var freshIsland = st && st.unlocks && !st.unlocks.garden && !st.unlocks.shop && !st.unlocks.farm &&
       !st.unlocks.deco && !st.unlocks.house && !st.unlocks.tower;
@@ -4791,6 +4843,7 @@
     selectedPlant = null;
     if (refs.decoDrawer) refs.decoDrawer.hidden = true;
     if (refs.gardenDrawer) refs.gardenDrawer.hidden = true;
+    if (refs.labelLayer) refs.labelLayer.style.display = 'none';
     selectedDeco = null;
     inFarm = false;
     farmTargetIndex = -1;
