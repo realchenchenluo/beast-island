@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>变身岛</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: #06090C;
+      color: #E9E1D2;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    button { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+    h1, h2, p { margin: 0; }
+    .app {
+      position: relative;
+      height: 100vh;
+      height: var(--app-height, 100vh);
+      max-width: 520px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0C1015;
+    }
+    .screens { position: relative; flex: 1 1 auto; min-height: 0; }
+    .screen {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      visibility: hidden;
+      overflow: hidden;
+      background: #0C1015;
+    }
+    .screen.is-active { opacity: 1; visibility: visible; }
+    .world-stage {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+      background: #2E86B8;
+      z-index: 0;
+      isolation: isolate;
+      transform: translateZ(0);
+    }
+    #world-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      z-index: 2;
+    }
+    .world-fallback {
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: linear-gradient(180deg, #12252F 0%, #274246 55%, #1D3538 55%, #14282B 100%);
+      z-index: 1;
+    }
+    .fallback-island {
+      position: absolute;
+      left: 50%;
+      bottom: 18%;
+      width: 86%;
+      height: 42%;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: radial-gradient(ellipse at 50% 35%, #4F7A5B, #355B45 55%, #223F31);
+      border: 8px solid #8E7446;
+    }
+    .fallback-sun {
+      position: absolute;
+      top: 10%;
+      right: 12%;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #F4E2B0, #C49A56 70%);
+    }
+    .world-loading {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(18, 24, 30, 0.92);
+      color: #E9E1D2;
+      border: 1px solid #3A4652;
+      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      z-index: 5;
+      white-space: nowrap;
+    }
+    .world-loading.is-hidden { display: none; }
+    .startup-status {
+      position: absolute;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: #A29A8B;
+      background: rgba(18, 24, 30, 0.92);
+      border: 1px solid #3A4652;
+      padding: 5px 12px;
+      border-radius: 999px;
+      z-index: 80;
+      white-space: nowrap;
+    }
+    .startup-status.is-hidden { display: none; }
+  </style>
+  <link rel="stylesheet" href="./assets/style.css" />
+  <link rel="stylesheet" href="./assets/theme.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="hud" id="hud">
+      <div class="hud-top">
+        <div class="brand">
+          <div class="brand-mark">变</div>
+          <div class="brand-text">
+            <h1>变身岛</h1>
+            <p id="hud-day">第 1 天 · 今天也要变强</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn hud-bag" data-action="go-bag" aria-label="打开背包">
+          <svg class="icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6 8h12l1 12H5L6 8z" fill="#6B635B"/>
+            <path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="#6B635B" stroke-width="2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="res-row">
+        <div class="res-pill">
+          <span class="res-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="#F2C94C"/>
+              <circle cx="12" cy="12" r="6" fill="none" stroke="#C98A3A" stroke-width="1.6"/>
+              <path d="M12 8.5v7M9.5 11h5" stroke="#8A5A2B" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <b id="res-coins">40</b><em>金币</em>
+        </div>
+        <div class="res-pill">
+          <span class="res-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 20C7 17 6 12 7 9c6-1 9 3 9 7 0 3-2 4-4 4z" fill="#6FCF97"/>
+              <path d="M12 20c0-5 1-8 4-10" stroke="#3E8E4E" stroke-width="1.4" fill="none"/>
+            </svg>
+          </span>
+          <b id="res-seeds">3</b><em>种子</em>
+        </div>
+        <div class="res-pill">
+          <span class="res-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z" fill="#4FC3E8"/>
+              <path d="M9.5 15a2.5 2.5 0 0 0 2.5 2.5" stroke="#D6F4FF" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <b id="res-water">3</b><em>清水</em>
+        </div>
+        <div class="res-pill power">
+          <span class="res-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M13 2 5 14h6l-1 8 9-13h-6z" fill="#F2994A"/>
+            </svg>
+          </span>
+          <b id="res-power">110</b><em>战力</em>
+        </div>
+      </div>
+    </header>
+
+    <main class="screens" id="screens">
+      <section id="screen-world" class="screen is-active">
+        <div class="world-stage" id="world-stage">
+          <div class="world-fallback">
+            <div class="fallback-sun"></div>
+            <div class="fallback-island"></div>
+          </div>
+          <canvas id="world-canvas"></canvas>
+          <div class="world-loading" id="world-loading">正在生成 3D 小岛…</div>
+          <div class="world-top">
+            <div class="world-place" id="world-place">青青小岛 · 南岸</div>
+            <div class="minimap-wrap">
+              <canvas id="minimap-canvas" width="76" height="92"></canvas>
+            </div>
+          </div>
+          <div class="world-hint" id="world-hint">摇杆 / WASD 移动 · 拖动画面旋转视角 · 点击地面寻路</div>
+          <div class="deco-drawer" id="deco-drawer" hidden>
+            <div class="deco-drawer-head">
+              <strong>装饰小岛</strong>
+              <span>等级越高越难获得 · 选中后点击附近草地摆放</span>
+              <button type="button" class="icon-btn small" data-action="world-decorate" aria-label="完成装饰">×</button>
+            </div>
+            <div class="deco-list" id="deco-list"></div>
+          </div>
+          <div class="world-controls">
+            <div class="joystick" id="joystick" aria-label="移动摇杆">
+              <div class="joystick-ring"></div>
+              <div class="joystick-knob" id="joystick-knob"></div>
+            </div>
+            <div class="world-right">
+              <div class="world-quick" aria-label="快捷操作">
+                <button type="button" class="quick-btn battle" data-action="go-battle"><span class="quick-ico" data-icon="sword" data-color="#171009"></span><span class="quick-label">战斗</span></button>
+                <button type="button" class="quick-btn tower" data-action="go-tower"><span class="quick-ico" data-icon="tower" data-color="#D6C2F0"></span><span class="quick-label">高塔</span></button>
+                <button type="button" class="quick-btn farm" data-action="go-farm"><span class="quick-ico" data-icon="sprout" data-color="#BFE6CB"></span><span class="quick-label">农田</span></button>
+                <button type="button" class="quick-btn" data-action="world-bag"><span class="quick-ico" data-icon="bag" data-color="#E7DCC8"></span><span class="quick-label">背包</span></button>
+                <button type="button" class="quick-btn" data-action="world-collection"><span class="quick-ico" data-icon="book" data-color="#A9CFE8"></span><span class="quick-label">图鉴</span></button>
+                <button type="button" class="quick-btn" data-action="world-decorate"><span class="quick-ico" data-icon="tree" data-color="#E3C07E"></span><span class="quick-label">装饰</span></button>
+              </div>
+              <button type="button" class="interact-btn" id="interact-btn" data-action="world-interact" disabled>
+                <span class="interact-label" id="interact-label">靠近目标互动</span>
+              </button>
+            </div>
+          </div>
+          <div class="farm-dock" id="farm-dock" hidden></div>
+        </div>
+      </section>
+
+      <section id="screen-prep" class="screen">
+        <div class="screen-shell" id="prep-shell"></div>
+      </section>
+
+      <section id="screen-battle" class="screen">
+        <div class="battle-wrap" id="battle-body"></div>
+      </section>
+
+      <section id="screen-result" class="screen">
+        <div class="screen-shell" id="result-shell"></div>
+      </section>
+
+      <section id="screen-bag" class="screen">
+        <div class="screen-shell" id="bag-shell"></div>
+      </section>
+
+      <section id="screen-shop" class="screen">
+        <div class="screen-shell" id="shop-shell"></div>
+      </section>
+
+      <section id="screen-collection" class="screen">
+        <div class="screen-shell" id="collection-shell"></div>
+      </section>
+
+      <section id="screen-tower" class="screen">
+        <div class="screen-shell" id="tower-shell"></div>
+      </section>
+    </main>
+
+    <p id="startup-status" class="startup-status" role="status">正在登陆小岛…若长时间未就绪，请退出后重新打开。</p>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="modal" class="modal" hidden></div>
+  </div>
+
+  <script defer src="./assets/data.js"></script>
+  <script defer src="./assets/art.js"></script>
+  <script defer src="./assets/core.js"></script>
+  <script defer src="./assets/battle.js"></script>
+  <script defer src="./assets/three.min.js"></script>
+  <script defer src="./assets/world.js"></script>
+  <script defer src="./assets/ui.js"></script>
+  <script defer src="./assets/main.js"></script>
+</body>
+</html>

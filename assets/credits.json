@@ -1,0 +1,138 @@
+{
+  "assets": [
+    {
+      "name": "three.js r120",
+      "source": "https://threejs.org",
+      "license": "MIT",
+      "usage": "3D 渲染引擎"
+    },
+    {
+      "name": "Lucide icons (adapted style)",
+      "source": "https://github.com/lucide-icons/lucide",
+      "license": "ISC",
+      "usage": "快捷操作栏与战斗/高塔/农田/背包/图鉴/装饰图标"
+    },
+    {
+      "name": "3D hero renders",
+      "source": "Generated from the bundled 3D creature models with three.js",
+      "license": "Same licenses as the underlying models",
+      "usage": "战斗/备战/结果/图鉴的 3D 模型英雄渲染图，替代旧 Fluent 头像"
+    }
+  ],
+  "note": "所有素材随包离线交付，运行时不发起网络请求。",
+  "models": {
+    "polyfork": {
+      "name": "Polyfork low-poly animal models",
+      "author": "Polyfork / Lucas Martinic",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "source": "https://polyfork.dev",
+      "catalog": "https://github.com/lucas-martinic/polyfork-catalog",
+      "changes": "Removed skeleton, skinning and animation data; kept bind-pose geometry, normals and vertex colors; quantized into a compact local binary payload and packed as RGB PNG package assets that are decoded lazily at runtime. Some forms are recolored at runtime.",
+      "modelIds": [
+        "rabbit-base",
+        "pig-base",
+        "sheep-base",
+        "goat-base",
+        "cow-base",
+        "fox-base",
+        "wolf-base",
+        "sea-turtle-base",
+        "giraffe-base",
+        "crocodile-base",
+        "bear-base",
+        "octopus-base",
+        "reef-shark-base",
+        "lion-base",
+        "elephant-base",
+        "green-gas-dragon-base",
+        "red-fire-dragon-base",
+        "purple-flame-dragon-base"
+      ]
+    },
+    "polyPizza": {
+      "name": "Poly by Google / Poly Pizza animal base models",
+      "sources": [
+        {
+          "key": "tiger",
+          "title": "Tiger",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/5A3w06FXUup"
+        },
+        {
+          "key": "panda",
+          "title": "Panda",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/2T6A0o4Kq2h"
+        },
+        {
+          "key": "monkey",
+          "title": "monkey",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/0yRz2AkLuuo"
+        },
+        {
+          "key": "eagle",
+          "title": "Eagle",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/d7CSLvsHULY"
+        },
+        {
+          "key": "hedgehog",
+          "title": "Hedgehog",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/8UNni5IvK_c"
+        },
+        {
+          "key": "whale",
+          "title": "Whale",
+          "author": "sirkitree",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/fo1MBzTFRZ3"
+        },
+        {
+          "key": "pheasant",
+          "title": "Pheasant",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/1wqLCnNFCgv"
+        },
+        {
+          "key": "egret",
+          "title": "Great egret",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/4GacWAa1lit"
+        },
+        {
+          "key": "whitelion",
+          "title": "Lion",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/daMBBUnd9c9"
+        },
+        {
+          "key": "turtle",
+          "title": "Turtle",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/2LCcq8vhqJ3"
+        },
+        {
+          "key": "horse",
+          "title": "Horse",
+          "author": "Poly by Google",
+          "license": "CC BY 3.0",
+          "modelPage": "https://poly.pizza/m/5ocnVSh_ZF-"
+        }
+      ],
+      "changes": "Kept bind-pose geometry, normals and UVs; dropped rigs/animations; packed indexed geometry into RGB PNG payloads; extracted and downsampled base colour textures; recoloured textures for white tiger, peacock, phoenix and baize; added procedural mythical features at runtime.",
+      "licenseNote": "Poly by Google models are CC BY 3.0; the whale model by sirkitree is CC BY 3.0. Model pages and authors are listed per source; modifications include rig/animation removal, texture extraction/downscaling, recolouring and procedural mythical features."
+    }
+  }
+}
