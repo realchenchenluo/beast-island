@@ -733,7 +733,18 @@
         '<circle cx="32" cy="24" r="4" fill="' + crop.color + '" opacity="0.8"/></svg>';
     }
     var fruit = '';
-    if (cropId === 'carrot') {
+    if (crop.type === 'buff') {
+      fruit = '<path d="M32 53 L32 30" stroke="#7A5235" stroke-width="5" stroke-linecap="round"/>' +
+        '<circle cx="22" cy="28" r="12" fill="#3F6F4A"/>' +
+        '<circle cx="38" cy="22" r="13" fill="#4F8A55"/>' +
+        '<circle cx="43" cy="34" r="10" fill="#5F9A5D"/>' +
+        '<circle cx="28" cy="20" r="9" fill="#76B06A"/>' +
+        '<circle cx="21" cy="30" r="4.6" fill="' + crop.color + '"/>' +
+        '<circle cx="38" cy="24" r="4.2" fill="' + crop.color + '"/>' +
+        '<circle cx="41" cy="36" r="3.6" fill="' + crop.color + '"/>' +
+        '<path d="M21 30 L21 30.2 M38 24 L38 24.2" stroke="#FFF3C4" stroke-width="2" stroke-linecap="round"/>' +
+        '<circle cx="32" cy="42" r="10" fill="none" stroke="' + crop.color + '" stroke-width="1.2" opacity="0.45"/>';
+    } else if (cropId === 'carrot') {
       fruit = '<path d="M26 34 L38 34 L32 54 Z" fill="#F2994A"/>' +
         '<path d="M28 32 Q32 22 36 32" fill="none" stroke="#4A9E5C" stroke-width="3" stroke-linecap="round"/>';
     } else if (cropId === 'pumpkin') {

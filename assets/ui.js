@@ -28,7 +28,8 @@
     { art: 'fox', title: '先学会走路', body: '左下角摇杆或 WASD / 方向键移动，拖动画面旋转视角，点击地面会自动寻路。靠近祭坛后点右下角的互动按钮。' },
     { art: 'tiger', title: '去祭坛赚第一笔金币', body: '战斗会自动进行：普通攻击更常出现并积累气势，气势满后才会随机释放技能。胜利后转动战利品转盘，金币和物资都从这里来。' },
     { art: 'hedgehog', title: '用金币建设小岛', body: '点右侧的「建设」打开建设页，可以解锁花园、杂货铺、小农田、装饰、小屋和高塔。解锁后建筑会真的出现在岛上，快捷栏也会多出对应入口。' },
-    { art: 'cow', title: '自由种出一座岛', body: '解锁花园后，点「种植」自选草、花、蕨、蘑菇、芦苇、卵石、灌木、树和岩石，点附近地面就能种。草簇免费，点已有植物可以拔除重来。' }
+    { art: 'cow', title: '自由种出一座岛', body: '解锁花园后，点「种植」自选草、花、蕨、蘑菇、芦苇、卵石、灌木、树和岩石，点附近地面就能种。草簇免费，点已有植物可以拔除重来。' },
+    { art: 'goat', title: '种一棵增益树', body: '解锁小农田后，除了普通作物，还能种战意树、铁壁树、疾风树。收获的果实会变成下一场战斗的增益，摘完再去祭坛打架。' }
   ];
   var farmDockTimer = null;
   var farmTargetIndex = -1;
@@ -64,6 +65,20 @@
 
   function rarityBadge(tier) {
     return '<span class="rarity-badge rarity-' + tier + '">' + (C.tierNames[tier] || '普通') + '</span>';
+  }
+
+  function money(n) {
+    return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function compactNumber(n) {
+    var v = Math.round(Number(n) || 0);
+    if (v >= 1000000) return String(Math.round(v / 10000)) + '万';
+    if (v >= 10000) {
+      var s = (v / 10000).toFixed(1);
+      return s.replace(/\.0$/, '') + '万';
+    }
+    return String(v);
   }
 
   function formatTime(sec) {
@@ -106,7 +121,7 @@
   function renderHUD() {
     var s = state();
     if (!s) return;
-    setText('res-coins', String(s.coins));
+    setText('res-coins', compactNumber(s.coins));
     setText('res-seeds', String(s.seeds));
     setText('res-water', String(s.water));
     setText('res-power', String(Core.getPower()));
@@ -192,6 +207,11 @@
       '</div></div>');
     html.push('</div>');
 
+    html.push('<button type="button" class="transform-cta" data-action="open-transform">' +
+      '<span class="transform-cta-ico">' + Art.icon('refresh', '#E8C98A') + '</span>' +
+      '<span class="transform-cta-text"><strong>指定变身</strong><em>金币 ' + money(D.TRANSFORM_COSTS[1]) + ' 起 · 直接变成任意生物</em></span>' +
+      '<span class="transform-cta-go">查看</span></button>');
+
     html.push('<div class="panel element-panel"><div class="panel-title">属性克制</div>' +
       '<div class="element-versus">' +
       '<div class="element-side">' + elementBadge(c.element) + '<strong>' + c.name + '</strong></div>' +
@@ -210,6 +230,29 @@
       '<div class="power-cell"><span>强化</span><b>+' + s.boost + '</b></div>' +
       '</div>' +
       '<div class="power-total">总战力 <b>' + battle.playerPower + '</b></div></div>');
+
+    var buffItems = '';
+    for (var bf = 0; bf < D.BATTLE_BUFFS.length; bf += 1) {
+      var bdef = D.BATTLE_BUFFS[bf];
+      var bcount = s.buffs[bdef.id] || 0;
+      if (bcount > 0) {
+        buffItems += '<span class="buff-chip" style="border-color:' + bdef.color + '66">' +
+          '<i class="buff-chip-ico">' + Art.icon(bdef.icon, bdef.color) + '</i>' +
+          '<strong>' + bdef.name + ' x' + bcount + '</strong><em>' + bdef.short + '</em></span>';
+      }
+    }
+    if (s.buffs.shield) {
+      buffItems += '<span class="buff-chip"><i class="buff-chip-ico">' + Art.icon('shield', '#8CC7A8') +
+        '</i><strong>护盾卡</strong><em>对手 -15%</em></span>';
+    }
+    if (s.buffs.double) {
+      buffItems += '<span class="buff-chip"><i class="buff-chip-ico">' + Art.icon('double', '#E8C98A') +
+        '</i><strong>双倍卡</strong><em>奖励翻倍</em></span>';
+    }
+    html.push('<div class="panel buff-panel"><div class="panel-title">战斗增益 <span>生效一场，战斗后消耗一层</span></div>' +
+      (buffItems ? '<div class="buff-chips">' + buffItems + '</div>' :
+        '<p class="buff-empty">暂无增益。解锁农田后种战意树 / 铁壁树 / 疾风树，收获果实就能带着增益去打架。</p>') +
+      '</div>');
 
     html.push('<div class="panel"><div class="panel-title">装备槽 <span>' + slotInfo.total + ' / ' + C.maxSlots +
       '（' + slotInfo.base + ' 基础 + ' + slotInfo.temporary + ' 临时）</span>' +
@@ -861,11 +904,14 @@
       html.push('<div class="farm-crop-row">');
       for (var i = 0; i < D.CROPS.length; i += 1) {
         var c = D.CROPS[i];
+        var cropBuff = c.buff ? Core.findBuff(c.buff) : null;
         var poor = s.seeds < c.seedCost;
         html.push('<button type="button" class="farm-crop-chip' +
           (farmSelectedCrop === c.id ? ' is-selected' : '') + (poor ? ' is-poor' : '') +
+          (cropBuff ? ' is-buff' : '') +
           '" data-action="farm-select-crop" data-crop="' + c.id + '">' +
           '<span class="farm-crop-chip-art">' + Art.crop(c.id, 2) + '</span>' +
+          (cropBuff ? '<i class="farm-buff-mark">增益</i>' : '') +
           '<b>' + c.name + '</b><em>' + c.seedCost + ' 种子</em></button>');
       }
       html.push('</div>');
@@ -875,7 +921,7 @@
       var stage = mature ? 2 : (plot.watered ? 1 : 0);
       var status;
       if (!plot.watered) status = '待浇水 · 需要 ' + crop.waterCost + ' 清水';
-      else if (mature) status = '已成熟 · 可以收获';
+      else if (mature) status = crop.buff ? ('已成熟 · 摘取' + crop.buffName) : '已成熟 · 可以收获';
       else status = '生长中 ' + Math.round(progress) + '% · 约 ' + formatDuration(plotRemain(plot));
       html.push('<div class="farm-dock-status"><span class="farm-status-art">' + Art.crop(crop.id, stage) + '</span>' +
         '<div class="farm-status-text"><strong>' + crop.name + '</strong><span>' + status + '</span>' +
@@ -903,6 +949,18 @@
       '<button type="button" class="btn farm-action ghost is-remove" data-action="farm-remove"' + (canRemove ? '' : ' disabled') + '>铲除</button>' +
       '</div>');
     el.innerHTML = html.join('');
+  }
+
+  function grantCropBuff(crop) {
+    if (!crop || !crop.buff) return '';
+    var buff = Core.findBuff(crop.buff);
+    var result = Core.addBattleBuff(crop.buff, 1);
+    if (!result.ok) {
+      if (result.reason === 'cap') return '，' + (crop.buffName || '增益') + '已达上限';
+      return '';
+    }
+    return '，获得「' + (buff ? buff.name : crop.buffName) + '」x' + result.count +
+      (buff ? '（' + buff.short + '）' : '');
   }
 
   function farmPlant() {
@@ -984,6 +1042,7 @@
       Core.addDeco(deco.id, 1);
       extras.push(deco.name);
     }
+    var buffMsg = grantCropBuff(crop);
     plot.cropId = null;
     plot.watered = false;
     plot.plantedAt = 0;
@@ -993,7 +1052,7 @@
     if (window.World && window.World.refreshFarmCrops) window.World.refreshFarmCrops();
     renderFarmDock();
     toast('收获 +' + crop.coins + ' 金币、+' + crop.seedReturn + ' 种子' +
-      (extras.length ? '，额外获得 ' + extras.join('、') : ''));
+      (extras.length ? '，额外获得 ' + extras.join('、') : '') + buffMsg, 2800);
   }
 
   function farmConfirmRemove() {
@@ -1044,12 +1103,13 @@
       '<div class="modal-body"><p class="modal-sub">种子 ' + s.seeds + ' · 清水 ' + s.water + '</p><div class="crop-list">';
     for (var i = 0; i < D.CROPS.length; i += 1) {
       var crop = D.CROPS[i];
+      var cropBuff = crop.buff ? Core.findBuff(crop.buff) : null;
       var enough = s.seeds >= crop.seedCost;
-      html += '<button type="button" class="crop-option" data-action="crop-choose" data-crop="' + crop.id + '" data-plot="' + plotIndex + '"' + (enough ? '' : ' disabled') + '>' +
+      html += '<button type="button" class="crop-option' + (cropBuff ? ' is-buff' : '') + '" data-action="crop-choose" data-crop="' + crop.id + '" data-plot="' + plotIndex + '"' + (enough ? '' : ' disabled') + '>' +
         '<span class="crop-art">' + Art.crop(crop.id, 2) + '</span>' +
-        '<span class="crop-info"><strong>' + crop.name + '</strong><span>' + crop.desc + '</span>' +
+        '<span class="crop-info"><strong>' + crop.name + (cropBuff ? ' · 增益' : '') + '</strong><span>' + crop.desc + '</span>' +
         '<em>种子 x' + crop.seedCost + ' · 浇水 x' + crop.waterCost + ' · ' + formatDuration(crop.growSec) + '</em>' +
-        '<b>收获 +' + crop.coins + ' 金币</b></span></button>';
+        '<b>' + (cropBuff ? ('收获 +' + crop.coins + ' 金币 · ' + crop.buffName + '（' + cropBuff.short + '）') : ('收获 +' + crop.coins + ' 金币')) + '</b></span></button>';
     }
     html += '</div>';
     if (s.seeds <= 0) html += '<p class="modal-warn">种子不够了，去战斗或杂货铺补充吧。</p>';
@@ -1141,6 +1201,7 @@
       Core.addDeco(deco.id, 1);
       extras.push(deco.name);
     }
+    var buffMsg = grantCropBuff(crop);
     plot.cropId = null;
     plot.watered = false;
     plot.plantedAt = 0;
@@ -1148,7 +1209,7 @@
     renderFarm();
     renderHUD();
     toast('收获 +' + crop.coins + ' 金币、+' + crop.seedReturn + ' 种子' +
-      (extras.length ? '，额外获得 ' + extras.join('、') : ''));
+      (extras.length ? '，额外获得 ' + extras.join('、') : '') + buffMsg, 2800);
   }
 
   /* ---------------- 背包 ---------------- */
@@ -1273,7 +1334,7 @@
         '</p>' +
         '<button type="button" class="btn danger wide" data-action="reset-save">重新开始</button></div>');
       html.push('<div class="panel"><div class="panel-title">关于</div>' +
-        '<p class="about-text">变身岛 v2.0 · 大世界探索、随机变身、属性克制、自动战斗、经营小岛。<br>' +
+        '<p class="about-text">变身岛 v2.1 · 大世界探索、随机变身、属性克制、自动战斗、增益树与金币指定变身。<br>' +
         '场景素材：Kenney（CC0）。全部内容离线运行，无需联网。</p></div>');
     }
 
@@ -1294,7 +1355,8 @@
       { id: 'legend', name: '传说 / 神话' }
     ];
     var html = [];
-    html.push(head('生物图鉴', '已变身 ' + stats.owned + ' / ' + stats.total + ' · 已遇见 ' + stats.seen, 'collection-back'));
+    html.push(head('生物图鉴', '已变身 ' + stats.owned + ' / ' + stats.total + ' · 已遇见 ' + stats.seen, 'collection-back',
+      '<button type="button" class="btn tiny" data-action="open-transform">指定变身</button>'));
     html.push('<div class="screen-body collection-body">');
 
     html.push('<div class="panel collection-summary"><div class="tier-chips">');
@@ -1463,6 +1525,85 @@
     toast(message);
   }
 
+  /* ---------------- 金币指定变身 ---------------- */
+  function openTransformModal() {
+    var s = state();
+    if (!s) return;
+    var html = '<div class="modal-mask" data-action="close-modal"></div><div class="modal-card transform-card">' +
+      '<div class="modal-head"><div class="transform-head-text"><strong>指定变身</strong>' +
+      '<span>金币 ' + money(s.coins) + '</span></div>' +
+      '<button type="button" class="icon-btn" data-action="close-modal" aria-label="关闭">' +
+      Art.icon('close', '#E9E1D2') + '</button></div>' +
+      '<div class="modal-body transform-body">' +
+      '<div class="transform-intro"><b>直接变成你指定的生物</b>' +
+      '<span>价格按稀有度决定，越高越贵。指定变身不消耗随机变身的传说 / 神话保底。</span></div>' +
+      '<div class="transform-legend"><span>普通 ' + money(D.TRANSFORM_COSTS[1]) + '</span>' +
+      '<span>稀有 ' + money(D.TRANSFORM_COSTS[2]) + '</span>' +
+      '<span>史诗 ' + money(D.TRANSFORM_COSTS[3]) + '</span>' +
+      '<span>传说 ' + money(D.TRANSFORM_COSTS[4]) + '</span>' +
+      '<span>神话 ' + money(D.TRANSFORM_COSTS[5]) + '</span></div>' +
+      '<div class="transform-grid">';
+    for (var i = 0; i < D.CREATURES.length; i += 1) {
+      var c = D.CREATURES[i];
+      var cost = Core.getTransformCost(c.id);
+      var current = s.formId === c.id;
+      var poor = s.coins < cost;
+      html += '<button type="button" class="transform-choice rarity-' + c.tier +
+        (current ? ' is-current' : '') + (poor ? ' is-poor' : '') + '" ' +
+        'data-action="select-transform" data-creature="' + c.id + '"' + (current ? ' disabled' : '') + '>' +
+        '<span class="transform-choice-art">' + Art.creature(c.id) + '</span>' +
+        '<span class="transform-choice-main"><strong>' + c.name + '</strong>' +
+        '<em>' + C.tierNames[c.tier] + ' · ' + c.power + ' 战力</em>' +
+        '<b><i class="coin-dot"></i>' + money(cost) + '</b></span>' +
+        (current ? '<span class="transform-current">当前</span>' : '') +
+        '</button>';
+    }
+    html += '</div></div></div>';
+    openModal(html);
+  }
+
+  function requestTransform(creatureId) {
+    var s = state();
+    var creature = Core.findCreature(creatureId);
+    if (!s || !creature) return;
+    if (s.formId === creatureId) { toast('你现在就是' + creature.name); return; }
+    var cost = Core.getTransformCost(creatureId);
+    if (s.coins < cost) {
+      toast('金币不足，还差 ' + money(cost - s.coins) + ' 金币');
+      return;
+    }
+    var html = '<div class="modal-mask" data-action="close-modal"></div><div class="modal-card transform-confirm-card">' +
+      '<div class="modal-head"><strong>确认变身</strong>' +
+      '<button type="button" class="icon-btn" data-action="close-modal" aria-label="关闭">' +
+      Art.icon('close', '#E9E1D2') + '</button></div>' +
+      '<div class="modal-body transform-confirm-body">' +
+      '<div class="transform-confirm-hero"><span class="transform-confirm-art">' + Art.creature(creatureId) + '</span>' +
+      '<div><strong>' + creature.name + '</strong><em>' + rarityBadge(creature.tier) +
+      ' <span class="transform-confirm-power">' + creature.power + ' 战力</span></em></div></div>' +
+      '<p class="transform-confirm-note">花费 <b>' + money(cost) + ' 金币</b>，金币将从 ' +
+      money(s.coins) + ' 变为 ' + money(s.coins - cost) + '。指定变身不会改变随机变身保底。</p>' +
+      '<div class="choice-buttons"><button type="button" class="btn ghost" data-action="close-modal">再想想</button>' +
+      '<button type="button" class="btn primary" data-action="confirm-transform" data-creature="' + creatureId + '">' +
+      '确认变身</button></div></div></div>';
+    openModal(html);
+  }
+
+  function confirmTransform(creatureId) {
+    var result = Core.transformTo(creatureId);
+    if (!result.ok) {
+      if (result.reason === 'coins') toast('金币不足，还差 ' + money(result.short || 0) + ' 金币');
+      else if (result.reason === 'same') toast('你现在就是' + result.creature.name);
+      else toast('暂时无法变身');
+      return;
+    }
+    closeModal();
+    renderHUD();
+    if (currentScreen === 'prep') renderPrep();
+    else if (currentScreen === 'collection') renderCollection();
+    else if (currentScreen === 'bag') renderBag(bagTab);
+    toast('花费 ' + money(result.cost) + ' 金币，变身为' + result.creature.name, 2600);
+  }
+
   /* ---------------- 建设与快捷栏 ---------------- */
   var UNLOCK_ICONS = {
     garden: 'sprout', shop: 'bag', farm: 'seed',
@@ -1603,6 +1744,12 @@
         tower: '高塔挑战已经加入快捷栏'
       };
       toast('已解锁「' + result.def.name + '」' + (unlockTips[unlockId] ? ' · ' + unlockTips[unlockId] : ''), 2600);
+    } else if (action === 'open-transform') {
+      openTransformModal();
+    } else if (action === 'select-transform') {
+      requestTransform(el.getAttribute('data-creature'));
+    } else if (action === 'confirm-transform') {
+      confirmTransform(el.getAttribute('data-creature'));
     } else if (action === 'world-garden') {
       if (!s.unlocks.garden) { showBuild('garden'); return; }
       if (currentScreen !== 'world') show('world');

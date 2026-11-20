@@ -91,6 +91,7 @@
   function findShopGood(id) { return findById(D.SHOP, id); }
   function findUnlock(id) { return findById(D.UNLOCKS, id); }
   function findPlant(id) { return findById(D.PLANTS, id); }
+  function findBuff(id) { return findById(D.BATTLE_BUFFS, id); }
   function isUnlocked(id) { return !!(state && state.unlocks && state.unlocks[id]); }
   function unlockBuilding(id) {
     var def = findUnlock(id);
@@ -121,6 +122,41 @@
     saveState();
     return { ok: true, def: def, x: tx, y: ty };
   }
+  function addBattleBuff(id, amount) {
+    var def = findBuff(id);
+    if (!state || !def) return { ok: false, reason: 'missing' };
+    if (!state.buffs) state.buffs = {};
+    var cur = parseInt(state.buffs[id], 10);
+    if (!isFinite(cur) || cur < 0) cur = 0;
+    var max = def.max || 5;
+    if (cur >= max) return { ok: false, reason: 'cap', def: def, count: cur };
+    var next = Math.min(max, cur + (amount || 1));
+    state.buffs[id] = next;
+    return { ok: true, def: def, count: next, added: next - cur };
+  }
+
+  function getTransformCost(id) {
+    var creature = findCreature(id);
+    if (!creature) return null;
+    return D.TRANSFORM_COSTS[creature.tier] || null;
+  }
+
+  function transformTo(id) {
+    var creature = findCreature(id);
+    if (!state || !creature) return { ok: false, reason: 'missing' };
+    if (state.formId === id) return { ok: false, reason: 'same', creature: creature };
+    var cost = getTransformCost(id);
+    if (!cost) return { ok: false, reason: 'missing' };
+    if (state.coins < cost) return { ok: false, reason: 'coins', cost: cost, short: cost - state.coins };
+    state.coins -= cost;
+    state.formId = id;
+    recordCollection(id, true);
+    state.transformLog.unshift({ id: id, tier: creature.tier, at: Date.now(), paid: cost });
+    if (state.transformLog.length > 30) state.transformLog.length = 30;
+    saveState();
+    return { ok: true, creature: creature, cost: cost };
+  }
+
   function removePlantAt(x, y) {
     if (!state) return null;
     for (var i = 0; i < state.plants.length; i += 1) {
@@ -181,7 +217,7 @@
       decoBag: { palm: 1, flowers: 1 },
       worldDecos: worldDecos,
       plots: plots,
-      buffs: { shield: false, double: false },
+      buffs: { shield: false, double: false, war: 0, guard: 0, focus: 0 },
       collection: collection,
       transformLog: [],
       luck: 0,
@@ -375,9 +411,18 @@
       });
     }
 
+    var rawBuffs = (raw.buffs && typeof raw.buffs === 'object') ? raw.buffs : {};
+    function buffCount(value) {
+      var n = parseInt(value, 10);
+      if (!isFinite(n) || n < 0) return 0;
+      return Math.min(5, n);
+    }
     s.buffs = {
-      shield: !!(raw.buffs && raw.buffs.shield),
-      double: !!(raw.buffs && raw.buffs.double)
+      shield: !!rawBuffs.shield,
+      double: !!rawBuffs.double,
+      war: buffCount(rawBuffs.war),
+      guard: buffCount(rawBuffs.guard),
+      focus: buffCount(rawBuffs.focus)
     };
 
     s.collection = normalizeCollection(raw, s.formId);
@@ -1038,6 +1083,10 @@
     findElement: findElement,
     findUnlock: findUnlock,
     findPlant: findPlant,
+    findBuff: findBuff,
+    addBattleBuff: addBattleBuff,
+    getTransformCost: getTransformCost,
+    transformTo: transformTo,
     isUnlocked: isUnlocked,
     unlockBuilding: unlockBuilding,
     buyPlant: buyPlant,

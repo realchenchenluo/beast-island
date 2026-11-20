@@ -5,10 +5,11 @@
   var D = window.GAME_DATA;
   var C = D.CONFIG;
 
-  function pickAction(round, ownRatio, enemyRatio, advantage, energy) {
+  function pickAction(round, ownRatio, enemyRatio, advantage, energy, skillBonus) {
     var nextEnergy = Math.min(100, energy + 25);
     if (energy >= 100 && round >= 2) {
-      var chance = 0.70 + (advantage ? 0.08 : 0) + (enemyRatio < 0.30 ? 0.07 : 0) - (ownRatio < 0.25 ? 0.12 : 0);
+      var chance = 0.70 + (advantage ? 0.08 : 0) + (enemyRatio < 0.30 ? 0.07 : 0) -
+        (ownRatio < 0.25 ? 0.12 : 0) + (skillBonus || 0);
       chance = Math.max(0.45, Math.min(0.92, chance));
       if (Math.random() < chance) return { action: 'skill', energy: 0, chance: chance };
     }
@@ -75,7 +76,9 @@
     return '属性被克：' + eEl.name + '克' + pEl.name + '，我方伤害 -15%。';
   }
 
-  function simulate(playerPower, enemyPower, playerCreature, enemyCreature) {
+  function simulate(playerPower, enemyPower, playerCreature, enemyCreature, options) {
+    options = options || {};
+    var skillBonus = Number(options.skillBonus) || 0;
     var pMax = Math.round(80 + playerPower * 0.9);
     var eMax = Math.round(80 + enemyPower * 0.9);
     var pHp = pMax;
@@ -100,7 +103,7 @@
         if (pHp <= 0 || eHp <= 0) break;
         if (order[i] === 'p') {
           var pBehind = pHp / pMax < 0.35;
-          var pAction = pickAction(roundNo, pHp / pMax, eHp / eMax, pAdvantage, pEnergy);
+          var pAction = pickAction(roundNo, pHp / pMax, eHp / eMax, pAdvantage, pEnergy, skillBonus);
           pEnergy = pAction.energy;
           var pRoll = rollDamage(playerPower, pBehind, pAction.action);
           pRoll.dmg = Math.max(1, Math.round(pRoll.dmg * pMult));
@@ -170,19 +173,31 @@
     if (!state.pendingEnemy) {
       state.pendingEnemy = window.Core.makeEnemy();
     }
-    var playerPower = window.Core.getPower();
+    var buffs = state.buffs || {};
+    var basePlayerPower = window.Core.getPower();
+    var playerPower = buffs.war > 0 ? Math.round(basePlayerPower * 1.2) : basePlayerPower;
     var baseEnemyPower = state.pendingEnemy.power;
     var enemyPower = baseEnemyPower;
-    if (state.buffs.shield) {
-      enemyPower = Math.max(40, Math.round(baseEnemyPower * 0.85));
+    if (buffs.shield) {
+      enemyPower = Math.round(enemyPower * 0.85);
     }
+    if (buffs.guard > 0) {
+      enemyPower = Math.round(enemyPower * 0.8);
+    }
+    enemyPower = Math.max(40, enemyPower);
     var playerCreature = window.Core.findCreature(state.formId);
     var enemyCreature = window.Core.findCreature(state.pendingEnemy.creatureId);
     return {
       playerPower: playerPower,
+      basePlayerPower: basePlayerPower,
       baseEnemyPower: baseEnemyPower,
       enemyPower: enemyPower,
-      shieldActive: state.buffs.shield,
+      shieldActive: !!buffs.shield,
+      warActive: !!(buffs.war > 0),
+      guardActive: !!(buffs.guard > 0),
+      focusActive: !!(buffs.focus > 0),
+      buffCharges: { war: buffs.war || 0, guard: buffs.guard || 0, focus: buffs.focus || 0 },
+      skillBonus: buffs.focus > 0 ? 0.12 : 0,
       playerCreature: playerCreature,
       enemyCreature: enemyCreature,
       matchup: window.Core.elementMatchup(playerCreature.element, enemyCreature.element)
@@ -191,7 +206,9 @@
 
   function createBattle(state) {
     var battle = prepare(state);
-    battle.sim = simulate(battle.playerPower, battle.enemyPower, battle.playerCreature, battle.enemyCreature);
+    battle.sim = simulate(battle.playerPower, battle.enemyPower, battle.playerCreature, battle.enemyCreature, {
+      skillBonus: battle.skillBonus
+    });
     return battle;
   }
 
@@ -235,6 +252,11 @@
       state.buffs.double = false;
     }
     state.buffs.shield = false;
+    var battleBuffIds = ['war', 'guard', 'focus'];
+    for (var bi = 0; bi < battleBuffIds.length; bi += 1) {
+      var bid = battleBuffIds[bi];
+      if (state.buffs[bid] > 0) state.buffs[bid] -= 1;
+    }
 
     if (state.towerBattle) {
       var floorBefore = state.tower.floor;
@@ -288,6 +310,9 @@
       upset: sim.upset,
       playerPower: battle.playerPower,
       enemyPower: battle.enemyPower,
+      warActive: battle.warActive,
+      guardActive: battle.guardActive,
+      focusActive: battle.focusActive,
       playerCreatureId: battle.playerCreature.id,
       enemyCreatureId: battle.enemyCreature.id,
       playerElement: battle.playerCreature.element,

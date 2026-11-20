@@ -2416,7 +2416,35 @@
       var mature = sp.watered && sp.plantedAt && Date.now() >= sp.plantedAt + crop.growSec * 1000;
       var pct = sp.watered && sp.plantedAt ? Math.min(1, (Date.now() - sp.plantedAt) / (crop.growSec * 1000)) : 0;
       var parts = [];
-      if (!sp.watered) {
+      if (crop.type === 'buff') {
+        var bc = crop.color || '#D9694F';
+        if (!sp.watered) {
+          parts.push(cyl(0.05, 0.07, 0.45, 5, '#7A5235', 0, 0.22, 0));
+          parts.push(sphere(0.18, 6, '#4A9E5C', -0.1, 0.46, 0));
+          parts.push(sphere(0.15, 6, '#5FB86F', 0.12, 0.52, 0));
+          parts.push(sphere(0.06, 5, bc, 0.02, 0.60, 0.02));
+        } else if (mature) {
+          parts.push(cyl(0.12, 0.20, 1.25, 6, '#7A5235', 0, 0.62, 0));
+          parts.push(cyl(0.06, 0.10, 0.65, 5, '#7A5235', -0.28, 1.18, 0.05, 0, 0, -0.55));
+          parts.push(cyl(0.06, 0.10, 0.62, 5, '#7A5235', 0.28, 1.15, -0.04, 0, 0, 0.55));
+          parts.push(sphere(0.62, 7, '#3F6F4A', 0, 1.62, 0, 1.08, 0.92, 1.02));
+          parts.push(sphere(0.48, 7, '#4F8A55', -0.48, 1.55, 0.12, 1.05, 0.92, 0.95));
+          parts.push(sphere(0.46, 7, '#5F9A5D', 0.46, 1.52, -0.10, 1.0, 0.9, 1.02));
+          parts.push(sphere(0.40, 6, '#76B06A', 0.02, 2.02, 0.05, 1.0, 0.88, 1.0));
+          parts.push(sphere(0.12, 7, bc, -0.32, 1.78, 0.44));
+          parts.push(sphere(0.11, 7, bc, 0.40, 1.68, 0.30));
+          parts.push(sphere(0.10, 7, bc, 0.10, 2.08, -0.30));
+          parts.push(sphere(0.09, 7, bc, -0.52, 1.48, -0.20));
+          parts.push(sphere(0.055, 5, '#FFF3C4', -0.34, 1.82, 0.47));
+          parts.push(sphere(0.05, 5, '#FFF3C4', 0.42, 1.72, 0.33));
+        } else {
+          var bh = 0.45 + pct * 0.62;
+          parts.push(cyl(0.07, 0.11, bh, 5, '#7A5235', 0, bh / 2, 0));
+          parts.push(sphere(0.24 + pct * 0.15, 6, '#4A9E5C', -0.10, bh + 0.18, 0));
+          parts.push(sphere(0.20 + pct * 0.12, 6, '#5FB86F', 0.16, bh + 0.12, 0.06));
+          if (pct > 0.65) parts.push(sphere(0.055, 5, bc, 0.14, bh + 0.20, 0.14));
+        }
+      } else if (!sp.watered) {
         parts.push(cyl(0.04, 0.05, 0.35, 5, '#5FB86F', 0, 0.18, 0));
         parts.push(sphere(0.12, 6, '#5FB86F', -0.1, 0.35, 0));
         parts.push(sphere(0.12, 6, '#4A9E5C', 0.1, 0.4, 0));

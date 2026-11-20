@@ -104,11 +104,28 @@
     { id: 'statue', name: '勇者雕像', power: 12, rarity: 4, weight: 2, desc: '纪念第一次以弱胜强。' }
   ];
 
+  var BATTLE_BUFFS = [
+    { id: 'war', name: '战意', crop: 'war_tree', icon: 'sword', color: '#D9694F', short: '战力 +20%', desc: '下一场战斗己方战力 +20%', max: 5 },
+    { id: 'guard', name: '铁壁', crop: 'guard_tree', icon: 'shield', color: '#5E8FB8', short: '对手 -20%', desc: '下一场战斗对手战力 -20%', max: 5 },
+    { id: 'focus', name: '疾风', crop: 'focus_tree', icon: 'star', color: '#7FB86A', short: '技能 +12%', desc: '下一场战斗技能释放概率 +12%', max: 5 }
+  ];
+
   var CROPS = [
     { id: 'carrot', name: '胡萝卜', growSec: 30, seedCost: 1, waterCost: 1, coins: 40, seedReturn: 1, itemChance: 0.04, decoChance: 0, color: '#6A5478', desc: '长得快，兔子最爱。' },
     { id: 'pumpkin', name: '南瓜', growSec: 75, seedCost: 2, waterCost: 1, coins: 100, seedReturn: 2, itemChance: 0.1, decoChance: 0.04, color: '#E8833A', desc: '个头大，能存很久。' },
-    { id: 'starfruit', name: '星星果', growSec: 150, seedCost: 3, waterCost: 2, coins: 240, seedReturn: 2, itemChance: 0.22, decoChance: 0.1, color: '#A87B3E', desc: '需要耐心，但回报惊人。' }
+    { id: 'starfruit', name: '星星果', growSec: 150, seedCost: 3, waterCost: 2, coins: 240, seedReturn: 2, itemChance: 0.22, decoChance: 0.1, color: '#A87B3E', desc: '需要耐心，但回报惊人。' },
+    { id: 'war_tree', name: '战意树', type: 'buff', buff: 'war', buffName: '战意果', growSec: 240, seedCost: 4, waterCost: 2, coins: 30, seedReturn: 1, itemChance: 0, decoChance: 0, color: '#D9694F', desc: '结出红色的战意果。摘下来，下一场战斗己方战力 +20%。' },
+    { id: 'guard_tree', name: '铁壁树', type: 'buff', buff: 'guard', buffName: '铁壁果', growSec: 300, seedCost: 5, waterCost: 3, coins: 40, seedReturn: 1, itemChance: 0, decoChance: 0, color: '#5E8FB8', desc: '结出青灰色的铁壁果。摘下来，下一场对手战力 -20%。' },
+    { id: 'focus_tree', name: '疾风树', type: 'buff', buff: 'focus', buffName: '疾风果', growSec: 360, seedCost: 6, waterCost: 3, coins: 50, seedReturn: 1, itemChance: 0, decoChance: 0, color: '#7FB86A', desc: '结出带风的疾风果。摘下来，下一场技能概率 +12%。' }
   ];
+
+  var TRANSFORM_COSTS = {
+    1: 2000,
+    2: 6000,
+    3: 15000,
+    4: 50000,
+    5: 200000
+  };
 
   var SHOP = [
     { id: 'seeds', name: '种子 x2', cost: 20, type: 'resource', key: 'seeds', amount: 2, desc: '种地必备，多囤不亏。' },
@@ -125,7 +142,7 @@
   var UNLOCKS = [
     { id: 'garden', name: '花园与自由种植', cost: 30, icon: 'tree', desc: '解锁后可以在草地上自由种草、花、树、灌木和岩石。' },
     { id: 'shop', name: '杂货铺', cost: 40, icon: 'bag', desc: '用金币购买种子、清水、肥料、道具卡和随机装备。' },
-    { id: 'farm', name: '小农田', cost: 80, icon: 'sprout', desc: '4 块田：种田、浇水、施肥、铲除，成熟后收获。' },
+    { id: 'farm', name: '小农田', cost: 80, icon: 'sprout', desc: '4 块田：普通作物，以及收获战斗增益果的战意树、铁壁树、疾风树。' },
     { id: 'deco', name: '装饰工坊', cost: 70, icon: 'tree', desc: '摆放 12 种装饰，提高小岛繁荣度和战力。' },
     { id: 'house', name: '小屋与图鉴', cost: 120, icon: 'book', desc: '解锁图鉴、变身次数和最近变身记录。' },
     { id: 'tower', name: '战斗高塔', cost: 150, icon: 'tower', desc: '12 层难度递增的连续挑战。' }
@@ -213,6 +230,8 @@
     CARDS: CARDS,
     DECORATIONS: DECORATIONS,
     CROPS: CROPS,
+    BATTLE_BUFFS: BATTLE_BUFFS,
+    TRANSFORM_COSTS: TRANSFORM_COSTS,
     SHOP: SHOP,
     WHEEL: WHEEL,
     UNLOCKS: UNLOCKS,
