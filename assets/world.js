@@ -1494,8 +1494,10 @@
           bg: 'rgba(16,22,28,0.90)', color: '#EAD9B4', stroke: '#7A5A32', scaleX: 4.0, scaleY: 0.9
         });
       } else {
+        var shrineLabel = b.type === 'shrine';
         sprite = makeTextSprite(b.name, {
-          bg: 'rgba(255,250,238,0.94)', color: '#3A3028', stroke: '#A97142', scaleX: 3.2, scaleY: 0.8
+          bg: 'rgba(255,250,238,0.94)', color: '#3A3028', stroke: '#A97142',
+          scaleX: shrineLabel ? 4.4 : 3.2, scaleY: shrineLabel ? 1.05 : 0.8
         });
       }
       if (!sprite) continue;
@@ -3870,10 +3872,10 @@
   }
 
   var PLANT_FOLIAGE = {
-    treeA: { tex: 'leaf-cards', draw: drawLeafCluster, count: 34, long: 0.78, tall: 0.64 },
-    treeB: { tex: 'pine-cards', draw: drawPineSpray, count: 34, long: 0.82, tall: 0.46 },
+    treeA: { tex: 'leaf-cards', draw: drawLeafCluster, count: 34, long: 0.66, tall: 0.54 },
+    treeB: { tex: 'pine-cards', draw: drawPineSpray, count: 32, long: 0.72, tall: 0.40 },
     treeC: { tex: 'palm-cards', draw: drawPalmLeaf, count: 16, long: 1.45, tall: 0.46 },
-    bush: { tex: 'bush-cards', draw: drawBushLeaves, count: 20, long: 0.52, tall: 0.42 }
+    bush: { tex: 'bush-cards', draw: drawBushLeaves, count: 20, long: 0.46, tall: 0.37 }
   };
   var foliageGeometries = {};
 
@@ -3901,7 +3903,7 @@
           Math.cos(phi) * 1.10,
           Math.sin(ta) * Math.sin(phi)
         );
-        pos.set(0.02 + dir.x * 1.24, 4.05 + dir.y * 1.02, dir.z * 1.22);
+        pos.set(0.02 + dir.x * 1.12, 4.03 + dir.y * 0.92, dir.z * 1.10);
         normal.set(dir.x, dir.y * 0.9 + 0.18, dir.z).normalize();
       } else if (variant === 'bush') {
         var ba = hash(i, 709) * Math.PI * 2;
@@ -3912,11 +3914,11 @@
           Math.cos(bphi) * 1.15,
           Math.sin(ba) * Math.sin(bphi)
         );
-        pos.set(bdir.x * 0.68, 0.62 + bdir.y * 0.48, bdir.z * 0.62);
+        pos.set(bdir.x * 0.60, 0.61 + bdir.y * 0.42, bdir.z * 0.55);
         normal.set(bdir.x, bdir.y * 0.8 + 0.25, bdir.z).normalize();
       } else if (variant === 'treeB') {
         var by = 1.95 + hash(i, 709) * 3.55;
-        var br = Math.max(0.22, (1.95 - (by - 1.55) * 0.31) * 0.82);
+        var br = Math.max(0.22, (1.95 - (by - 1.55) * 0.31) * 0.74);
         var baa = hash(i, 711) * Math.PI * 2;
         pos.set(Math.cos(baa) * br, by, Math.sin(baa) * br);
         normal.set(Math.cos(baa) * 0.82, 0.52, Math.sin(baa) * 0.82).normalize();
@@ -4733,7 +4735,12 @@
     syncFromState();
     scheduleResize();
     drawMinimap();
-    showHint('摇杆 / WASD 移动 · 拖动画面旋转视角 · 点击地面寻路', 5000);
+    var st = window.Core.getState();
+    var freshIsland = st && st.unlocks && !st.unlocks.garden && !st.unlocks.shop && !st.unlocks.farm &&
+      !st.unlocks.deco && !st.unlocks.house && !st.unlocks.tower;
+    showHint(freshIsland
+      ? '沿土路去北边祭坛战斗赚金币 · 点右下角「建设」解锁小岛'
+      : '摇杆 / WASD 移动 · 拖动画面旋转视角 · 点击地面寻路', 5600);
     lastTime = (window.performance && performance.now) ? performance.now() : Date.now();
     if (!running) {
       rafId = requestAnimationFrame(loop);
