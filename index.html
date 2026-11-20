@@ -6,6 +6,7 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="format-detection" content="telephone=no" />
   <title>变身岛</title>
+  <link rel="icon" type="image/png" href="./assets/icon.png" />
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
@@ -206,19 +207,29 @@
             </div>
             <div class="deco-list" id="deco-list"></div>
           </div>
+          <div class="garden-drawer" id="garden-drawer" hidden>
+            <div class="garden-drawer-head">
+              <strong>自由种植</strong>
+              <span>点击附近草地种下 · 点已有植物可拔除 · 草簇免费</span>
+              <button type="button" class="icon-btn small" data-action="world-garden" aria-label="完成种植">×</button>
+            </div>
+            <div class="garden-list" id="garden-list"></div>
+          </div>
           <div class="world-controls">
             <div class="joystick" id="joystick" aria-label="移动摇杆">
               <div class="joystick-ring"></div>
               <div class="joystick-knob" id="joystick-knob"></div>
             </div>
             <div class="world-right">
-              <div class="world-quick" aria-label="快捷操作">
+              <div class="world-quick" id="world-quick" aria-label="快捷操作">
                 <button type="button" class="quick-btn battle" data-action="go-battle"><span class="quick-ico" data-icon="sword" data-color="#171009"></span><span class="quick-label">战斗</span></button>
-                <button type="button" class="quick-btn tower" data-action="go-tower"><span class="quick-ico" data-icon="tower" data-color="#D6C2F0"></span><span class="quick-label">高塔</span></button>
-                <button type="button" class="quick-btn farm" data-action="go-farm"><span class="quick-ico" data-icon="sprout" data-color="#BFE6CB"></span><span class="quick-label">农田</span></button>
+                <button type="button" class="quick-btn build" data-action="go-build"><span class="quick-ico" data-icon="build" data-color="#F0D7A4"></span><span class="quick-label">建设</span></button>
+                <button type="button" class="quick-btn garden" data-action="world-garden" data-unlock="garden"><span class="quick-ico" data-icon="sprout" data-color="#A7E0A8"></span><span class="quick-label">种植</span></button>
+                <button type="button" class="quick-btn farm" data-action="go-farm" data-unlock="farm"><span class="quick-ico" data-icon="seed" data-color="#BFE6CB"></span><span class="quick-label">农田</span></button>
+                <button type="button" class="quick-btn tower" data-action="go-tower" data-unlock="tower"><span class="quick-ico" data-icon="tower" data-color="#D6C2F0"></span><span class="quick-label">高塔</span></button>
+                <button type="button" class="quick-btn" data-action="world-decorate" data-unlock="deco"><span class="quick-ico" data-icon="tree" data-color="#E3C07E"></span><span class="quick-label">装饰</span></button>
+                <button type="button" class="quick-btn" data-action="world-collection" data-unlock="house"><span class="quick-ico" data-icon="book" data-color="#A9CFE8"></span><span class="quick-label">图鉴</span></button>
                 <button type="button" class="quick-btn" data-action="world-bag"><span class="quick-ico" data-icon="bag" data-color="#E7DCC8"></span><span class="quick-label">背包</span></button>
-                <button type="button" class="quick-btn" data-action="world-collection"><span class="quick-ico" data-icon="book" data-color="#A9CFE8"></span><span class="quick-label">图鉴</span></button>
-                <button type="button" class="quick-btn" data-action="world-decorate"><span class="quick-ico" data-icon="tree" data-color="#E3C07E"></span><span class="quick-label">装饰</span></button>
               </div>
               <button type="button" class="interact-btn" id="interact-btn" data-action="world-interact" disabled>
                 <span class="interact-label" id="interact-label">靠近目标互动</span>
@@ -227,6 +238,10 @@
           </div>
           <div class="farm-dock" id="farm-dock" hidden></div>
         </div>
+      </section>
+
+      <section id="screen-build" class="screen">
+        <div class="screen-shell" id="build-shell"></div>
       </section>
 
       <section id="screen-prep" class="screen">

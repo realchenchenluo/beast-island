@@ -89,6 +89,49 @@
   function findCrop(id) { return findById(D.CROPS, id); }
   function findCard(id) { return findById(D.CARDS, id); }
   function findShopGood(id) { return findById(D.SHOP, id); }
+  function findUnlock(id) { return findById(D.UNLOCKS, id); }
+  function findPlant(id) { return findById(D.PLANTS, id); }
+  function isUnlocked(id) { return !!(state && state.unlocks && state.unlocks[id]); }
+  function unlockBuilding(id) {
+    var def = findUnlock(id);
+    if (!state || !def) return { ok: false, reason: 'missing' };
+    if (state.unlocks[id]) return { ok: false, reason: 'owned' };
+    if (state.coins < def.cost) return { ok: false, reason: 'coins' };
+    state.coins -= def.cost;
+    state.unlocks[id] = true;
+    saveState();
+    return { ok: true, def: def };
+  }
+  function buyPlant(id, x, y) {
+    var def = findPlant(id);
+    if (!state || !def) return { ok: false, reason: 'missing' };
+    if (!state.unlocks.garden) return { ok: false, reason: 'locked' };
+    if (state.coins < def.cost) return { ok: false, reason: 'coins' };
+    if (state.plants.length >= C.maxPlants) return { ok: false, reason: 'full' };
+    var tx = Math.round(Number(x));
+    var ty = Math.round(Number(y));
+    if (!isFinite(tx) || !isFinite(ty) || tx < 0 || tx >= W.cols || ty < 0 || ty >= W.rows) {
+      return { ok: false, reason: 'bounds' };
+    }
+    for (var i = 0; i < state.plants.length; i += 1) {
+      if (state.plants[i].x === tx && state.plants[i].y === ty) return { ok: false, reason: 'occupied' };
+    }
+    state.coins -= def.cost;
+    state.plants.push({ id: def.id, x: tx, y: ty });
+    saveState();
+    return { ok: true, def: def, x: tx, y: ty };
+  }
+  function removePlantAt(x, y) {
+    if (!state) return null;
+    for (var i = 0; i < state.plants.length; i += 1) {
+      if (state.plants[i].x === x && state.plants[i].y === y) {
+        var removed = state.plants.splice(i, 1)[0];
+        saveState();
+        return findPlant(removed.id);
+      }
+    }
+    return null;
+  }
   function findElement(id) { return D.ELEMENTS[id] || D.ELEMENTS.land; }
 
   function pick(list) {
@@ -133,6 +176,8 @@
       items: [],
       cards: cards,
       guideSeen: false,
+      unlocks: { garden: false, shop: false, farm: false, deco: false, house: false, tower: false },
+      plants: [],
       decoBag: { palm: 1, flowers: 1 },
       worldDecos: worldDecos,
       plots: plots,
@@ -229,6 +274,28 @@
     s.boost = num(raw.boost, 0, 0, 99999);
     s.totalBattles = num(raw.totalBattles, 0, 0, 9999999);
     s.guideSeen = !!raw.guideSeen;
+    s.unlocks = {};
+    var hasUnlockSave = raw.unlocks && typeof raw.unlocks === 'object';
+    for (i = 0; i < D.UNLOCKS.length; i += 1) {
+      s.unlocks[D.UNLOCKS[i].id] = hasUnlockSave ? !!raw.unlocks[D.UNLOCKS[i].id] : true;
+    }
+    s.plants = [];
+    var plantSeen = {};
+    if (Array.isArray(raw.plants)) {
+      for (i = 0; i < raw.plants.length && s.plants.length < C.maxPlants; i += 1) {
+        var pl = raw.plants[i];
+        var pdef = pl ? findById(D.PLANTS, pl.id) : null;
+        if (!pdef) continue;
+        var plx = Math.round(Number(pl.x));
+        var ply = Math.round(Number(pl.y));
+        if (!isFinite(plx) || !isFinite(ply)) continue;
+        if (plx < 0 || plx >= W.cols || ply < 0 || ply >= W.rows) continue;
+        var pkey = plx + ',' + ply;
+        if (plantSeen[pkey]) continue;
+        plantSeen[pkey] = true;
+        s.plants.push({ id: pdef.id, x: plx, y: ply });
+      }
+    }
     s.tower = {
       active: !!(raw.tower && raw.tower.active),
       floor: clamp(num(raw.tower && raw.tower.floor, 1, 1, D.TOWER.floors), 1, D.TOWER.floors),
@@ -410,6 +477,13 @@
   function getDecoAt(x, y) {
     for (var i = 0; i < state.worldDecos.length; i += 1) {
       if (state.worldDecos[i].x === x && state.worldDecos[i].y === y) return state.worldDecos[i];
+    }
+    return null;
+  }
+
+  function getPlantAt(x, y) {
+    for (var i = 0; i < state.plants.length; i += 1) {
+      if (state.plants[i].x === x && state.plants[i].y === y) return state.plants[i];
     }
     return null;
   }
@@ -962,6 +1036,12 @@
     findCard: findCard,
     findShopGood: findShopGood,
     findElement: findElement,
+    findUnlock: findUnlock,
+    findPlant: findPlant,
+    isUnlocked: isUnlocked,
+    unlockBuilding: unlockBuilding,
+    buyPlant: buyPlant,
+    removePlantAt: removePlantAt,
     getItemByUid: getItemByUid,
     getEquipPower: getEquipPower,
     getDecoPower: getDecoPower,
@@ -970,6 +1050,7 @@
     getDecoBagCount: getDecoBagCount,
     getWorldDecoCount: getWorldDecoCount,
     getDecoAt: getDecoAt,
+    getPlantAt: getPlantAt,
     placeDecoAt: placeDecoAt,
     removeDecoAt: removeDecoAt,
     getSlotsInfo: getSlotsInfo,

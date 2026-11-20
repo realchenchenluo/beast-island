@@ -18,7 +18,7 @@
   var WATER_Y = -0.18;
   var HEIGHT = { 0: -1.0, 1: -0.5, 2: 0.05, 3: 0.3, 4: 0.34, 5: -0.35 };
   var TILE_COLORS = {
-    0: '#2A6F8E', 1: '#5FB3C6', 2: '#DCC38F', 3: '#6FA85F', 4: '#C9A97E', 5: '#2F7F9E'
+    0: '#2A6F8E', 1: '#5FB3C6', 2: '#CBB78C', 3: '#5E8F50', 4: '#B08A5C', 5: '#2F7F9E'
   };
 
   var refs = {};
@@ -64,7 +64,7 @@
     pendingInteract: null,
     moving: false
   };
-  var cam = { yaw: 0, pitch: 0.7, distance: 16 };
+  var cam = { yaw: 0, pitch: 0.60, distance: 14 };
   var camTarget = null;
   var camDesired = null;
 
@@ -141,6 +141,10 @@
   var lastInteractLabel = '';
   var decorateMode = false;
   var selectedDeco = null;
+  var gardenMode = false;
+  var selectedPlant = null;
+  var plantMeshes = [];
+  var plantSolidTiles = {};
   var initialized = false;
   var errorCount = 0;
   var hintTimer = null;
@@ -659,315 +663,7 @@
       }
     }
 
-    function nearPath(tx, ty, radius) {
-      for (var yy = ty - radius; yy <= ty + radius; yy += 1) {
-        for (var xx = tx - radius; xx <= tx + radius; xx += 1) {
-          if (inBounds(xx, yy) && tiles[yy][xx] === 4) return true;
-        }
-      }
-      return false;
-    }
-
-    function nearBuilding(tx, ty, pad) {
-      for (var i = 0; i < buildings.length; i += 1) {
-        var b = buildings[i];
-        if (tx >= b.x - pad && tx < b.x + b.w + pad && ty >= b.y - pad && ty < b.y + b.h + pad) return true;
-      }
-      return false;
-    }
-
-    function canPlace(tx, ty) {
-      if (!inBounds(tx, ty)) return false;
-      if (tiles[ty][tx] !== 3) return false;
-      if (solid[ty][tx] || occupied[ty][tx]) return false;
-      if (nearPath(tx, ty, 2)) return false;
-      if (nearBuilding(tx, ty, 1)) return false;
-      if (dist2(tx + 0.5, ty + 0.5, W.spawn.x, W.spawn.y) < 3) return false;
-      if (dist2(tx + 0.5, ty + 0.5, 20, 30) < 3.5) return false;
-      return true;
-    }
-
-    function canPlaceSmall(tx, ty, pathPad) {
-      if (!inBounds(tx, ty)) return false;
-      var t = tiles[ty][tx];
-      if (t !== 3 && t !== 2) return false;
-      if (solid[ty][tx] || occupied[ty][tx]) return false;
-      if (nearPath(tx, ty, pathPad == null ? 0 : pathPad)) return false;
-      if (nearBuilding(tx, ty, 0)) return false;
-      if (dist2(tx + 0.5, ty + 0.5, W.spawn.x, W.spawn.y) < 2.2) return false;
-      return true;
-    }
-
-    function addScenery(asset, tx, ty, isSolid, blocksDeco) {
-      scenery.push({ asset: asset, x: tx, y: ty });
-      occupied[ty][tx] = true;
-      if (isSolid) solid[ty][tx] = true;
-      if (blocksDeco) decoBlocked[ty][tx] = true;
-    }
-
-    function farFromPlaced(tx, ty, minDist) {
-      var lim = minDist * minDist;
-      for (var i = 0; i < scenery.length; i += 1) {
-        var o = scenery[i];
-        var dx = o.x - tx;
-        var dy = o.y - ty;
-        if (dx * dx + dy * dy < lim) return false;
-      }
-      return true;
-    }
-
-    var treeAssets = ['tree1', 'tree2', 'tree3', 'round', 'round2', 'long', 'pine'];
-    var bushAssets = ['bush1', 'bush3', 'bush4', 'hedge'];
-
-    function makeCenters(count, minDist, pathPad, buildingPad, spawnMin) {
-      var centers = [];
-      var tries = 0;
-      while (centers.length < count && tries < 900) {
-        tries += 1;
-        var cx2 = 2 + Math.floor(rand() * (COLS - 4));
-        var cy2 = 2 + Math.floor(rand() * (ROWS - 4));
-        if (tiles[cy2][cx2] !== 3) continue;
-        if (nearPath(cx2, cy2, pathPad) || nearBuilding(cx2, cy2, buildingPad)) continue;
-        if (dist2(cx2 + 0.5, cy2 + 0.5, W.spawn.x, W.spawn.y) < spawnMin * spawnMin) continue;
-        var ok = true;
-        for (var ci = 0; ci < centers.length; ci += 1) {
-          if (dist2(cx2, cy2, centers[ci].x, centers[ci].y) < minDist * minDist) { ok = false; break; }
-        }
-        if (ok) centers.push({ x: cx2, y: cy2 });
-      }
-      return centers;
-    }
-
-    function around(center, radius) {
-      return {
-        x: Math.round(center.x + (rand() * 2 - 1) * radius),
-        y: Math.round(center.y + (rand() * 2 - 1) * radius)
-      };
-    }
-
-    var groves = makeCenters(10, 7, 3, 2, 8);
-    var meadows = makeCenters(12, 5, 1, 1, 6);
-    var rockCenters = makeCenters(6, 9, 2, 2, 7);
-    var treeCount = 0;
-    var attempts = 0;
-    while (treeCount < 96 && attempts < 6500 && groves.length) {
-      attempts += 1;
-      var grove = groves[Math.floor(rand() * groves.length)];
-      var tp = around(grove, 4);
-      var tx = tp.x;
-      var ty = tp.y;
-      if (!canPlace(tx, ty)) continue;
-      if (!farFromPlaced(tx, ty, 2.25)) continue;
-      var asset;
-      if (ty < 14) asset = rand() < 0.55 ? 'pine' : 'tree2';
-      else asset = treeAssets[Math.floor(rand() * treeAssets.length)];
-      addScenery(asset, tx, ty, true, true);
-      treeCount += 1;
-    }
-
-    var palmCount = 0;
-    attempts = 0;
-    while (palmCount < 12 && attempts < 3200) {
-      attempts += 1;
-      var px = Math.floor(rand() * COLS);
-      var py = Math.floor(rand() * ROWS);
-      if (!canPlace(px, py)) continue;
-      if (!nearPath(px, py, 3)) continue;
-      if (!farFromPlaced(px, py, 1.8)) continue;
-      addScenery('palm', px, py, true, true);
-      palmCount += 1;
-    }
-
-    var rockCount = 0;
-    attempts = 0;
-    while (rockCount < 34 && attempts < 2600 && rockCenters.length) {
-      attempts += 1;
-      var rc = rockCenters[Math.floor(rand() * rockCenters.length)];
-      var rp = around(rc, 2.6);
-      var rx2 = rp.x;
-      var ry2 = rp.y;
-      if (!canPlace(rx2, ry2)) continue;
-      if (!farFromPlaced(rx2, ry2, 1.3)) continue;
-      addScenery('rock', rx2, ry2, true, true);
-      rockCount += 1;
-    }
-
-    var bushCount = 0;
-    attempts = 0;
-    while (bushCount < 52 && attempts < 2600 && groves.length) {
-      attempts += 1;
-      var bg = groves[Math.floor(rand() * groves.length)];
-      var bp = around(bg, 5);
-      var bx2 = bp.x;
-      var by2 = bp.y;
-      if (!canPlace(bx2, by2)) continue;
-      if (!farFromPlaced(bx2, by2, 1.15)) continue;
-      addScenery(bushAssets[Math.floor(rand() * bushAssets.length)], bx2, by2, true, true);
-      bushCount += 1;
-    }
-
-    var logCount = 0;
-    attempts = 0;
-    while (logCount < 5 && attempts < 1600 && groves.length) {
-      attempts += 1;
-      var lg = groves[Math.floor(rand() * groves.length)];
-      var lp = around(lg, 6);
-      var lx = lp.x;
-      var ly = lp.y;
-      if (!canPlace(lx, ly)) continue;
-      if (!farFromPlaced(lx, ly, 1.2)) continue;
-      addScenery(logCount % 2 ? 'log' : 'stump', lx, ly, true, true);
-      logCount += 1;
-    }
-
-    var flowerCount = 0;
-    attempts = 0;
-    while (flowerCount < 104 && attempts < 3200) {
-      attempts += 1;
-      var fp = (meadows.length && rand() < 0.72)
-        ? around(meadows[Math.floor(rand() * meadows.length)], 4)
-        : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
-      var fx = fp.x;
-      var fy = fp.y;
-      if (!canPlaceSmall(fx, fy, 0)) continue;
-      if (!farFromPlaced(fx, fy, 0.55)) continue;
-      addScenery('flower', fx, fy, false, false);
-      flowerCount += 1;
-    }
-
-    var grassCount = 0;
-    attempts = 0;
-    while (grassCount < 560 && attempts < 9000) {
-      attempts += 1;
-      var gp = (meadows.length && rand() < 0.70)
-        ? around(meadows[Math.floor(rand() * meadows.length)], 4)
-        : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
-      var gx = gp.x;
-      var gy = gp.y;
-      if (!canPlaceSmall(gx, gy, 0)) continue;
-      if (!farFromPlaced(gx, gy, 0.5)) continue;
-      addScenery('grass', gx, gy, false, false);
-      grassCount += 1;
-    }
-
-    var mushroomCount = 0;
-    attempts = 0;
-    while (mushroomCount < 28 && attempts < 1200) {
-      attempts += 1;
-      var mg = groves.length ? groves[Math.floor(rand() * groves.length)] : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
-      var mp = groves.length ? around(mg, 5) : mg;
-      var mx = mp.x;
-      var my = mp.y;
-      if (!canPlaceSmall(mx, my, 0)) continue;
-      if (!farFromPlaced(mx, my, 0.6)) continue;
-      addScenery('mushroom', mx, my, false, false);
-      mushroomCount += 1;
-    }
-
-    var fernCount = 0;
-    attempts = 0;
-    while (fernCount < 40 && attempts < 1600) {
-      attempts += 1;
-      var fg = groves.length ? groves[Math.floor(rand() * groves.length)] : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
-      var fp2 = groves.length ? around(fg, 6) : fg;
-      var fnx = fp2.x;
-      var fny = fp2.y;
-      if (!canPlaceSmall(fnx, fny, 0)) continue;
-      if (!farFromPlaced(fnx, fny, 0.6)) continue;
-      addScenery('fern', fnx, fny, false, false);
-      fernCount += 1;
-    }
-
-    var fringeFlowers = 0;
-    attempts = 0;
-    while (fringeFlowers < 34 && attempts < 2400) {
-      attempts += 1;
-      var ffx = Math.floor(rand() * COLS);
-      var ffy = Math.floor(rand() * ROWS);
-      if (!nearPath(ffx, ffy, 2) || nearPath(ffx, ffy, 0)) continue;
-      if (!canPlaceSmall(ffx, ffy, 0)) continue;
-      if (!farFromPlaced(ffx, ffy, 0.55)) continue;
-      addScenery('flower', ffx, ffy, false, false);
-      fringeFlowers += 1;
-    }
-
-    var fringeGrass = 0;
-    attempts = 0;
-    while (fringeGrass < 90 && attempts < 4000) {
-      attempts += 1;
-      var ggx = Math.floor(rand() * COLS);
-      var ggy = Math.floor(rand() * ROWS);
-      if (!nearPath(ggx, ggy, 2) || nearPath(ggx, ggy, 0)) continue;
-      if (!canPlaceSmall(ggx, ggy, 0)) continue;
-      if (!farFromPlaced(ggx, ggy, 0.5)) continue;
-      addScenery('grass', ggx, ggy, false, false);
-      fringeGrass += 1;
-    }
-
-    var reedCount = 0;
-    attempts = 0;
-    while (reedCount < 18 && attempts < 1000) {
-      attempts += 1;
-      var rdx = Math.floor(rand() * COLS);
-      var rdy = Math.floor(rand() * ROWS);
-      if (!canPlaceSmall(rdx, rdy, 0)) continue;
-      if (dist2(rdx, rdy, 9, 15) > 9) continue;
-      if (!farFromPlaced(rdx, rdy, 0.55)) continue;
-      addScenery('reed', rdx, rdy, false, false);
-      reedCount += 1;
-    }
-
-    var pebbleCount = 0;
-    attempts = 0;
-    while (pebbleCount < 48 && attempts < 2000) {
-      attempts += 1;
-      var pbx = Math.floor(rand() * COLS);
-      var pby = Math.floor(rand() * ROWS);
-      if (!canPlaceSmall(pbx, pby, 0)) continue;
-      if (!nearPath(pbx, pby, 1) && tiles[pby][pbx] !== 2) continue;
-      if (!farFromPlaced(pbx, pby, 0.4)) continue;
-      addScenery('pebble', pbx, pby, false, false);
-      pebbleCount += 1;
-    }
-
-    var lanternSpots = [[22, 13], [22, 21], [22, 29], [22, 37], [22, 43], [15, 32], [18, 32], [27, 32], [30, 32]];
-    for (var li = 0; li < lanternSpots.length; li += 1) {
-      var lx2 = lanternSpots[li][0];
-      var ly2 = lanternSpots[li][1];
-      if (!inBounds(lx2, ly2) || occupied[ly2][lx2] || solid[ly2][lx2]) continue;
-      addScenery('lantern', lx2, ly2, false, true);
-    }
-
-    var benchSpots = [[14, 19], [6, 21], [24, 34]];
-    for (var bi2 = 0; bi2 < benchSpots.length; bi2 += 1) {
-      var bx3 = benchSpots[bi2][0];
-      var by3 = benchSpots[bi2][1];
-      if (!inBounds(bx3, by3) || occupied[by3][bx3] || solid[by3][bx3]) continue;
-      addScenery('bench', bx3, by3, false, true);
-    }
-
-    var markerSpots = [[19, 30], [21, 32], [13, 31], [32, 30], [27, 43], [20, 10]];
-    for (var mi2 = 0; mi2 < markerSpots.length; mi2 += 1) {
-      var mx2 = markerSpots[mi2][0];
-      var my2 = markerSpots[mi2][1];
-      if (!inBounds(mx2, my2) || occupied[my2][mx2] || solid[my2][mx2]) continue;
-      addScenery('stoneMarker', mx2, my2, false, true);
-    }
-
-    var signs = [
-      { x: 18, y: 35, text: '祭坛 ↑  农田 ←  集市 →' },
-      { x: 26, y: 32, text: '杂货铺 →' },
-      { x: 14, y: 29, text: '小农田' }
-    ];
-    for (var si = 0; si < signs.length; si += 1) {
-      var sg = signs[si];
-      if (inBounds(sg.x, sg.y) && tiles[sg.y][sg.x] !== 0 && tiles[sg.y][sg.x] !== 1 &&
-          !occupied[sg.y][sg.x] && !solid[sg.y][sg.x]) {
-        scenery.push({ asset: 'sign', x: sg.x, y: sg.y, text: sg.text });
-        occupied[sg.y][sg.x] = true;
-        decoBlocked[sg.y][sg.x] = true;
-      }
-    }
+    /* 空岛开局：岛上不预置任何花草树木与标牌，全部交给玩家种植。 */
 
     solid[Math.floor(W.spawn.y)][Math.floor(W.spawn.x)] = false;
     for (var bj = 0; bj < buildings.length; bj += 1) {
@@ -1050,63 +746,175 @@
   }
 
   function drawTerrainDetail(g, S) {
-    g.fillStyle = '#F7F3E8';
+    g.fillStyle = '#F5F3E6';
     g.fillRect(0, 0, S, S);
-    for (var i = 0; i < 420; i += 1) {
-      var x = hash(i, 3) * S;
-      var y = hash(i, 7) * S;
-      var len = 1 + hash(i, 11) * 4;
-      g.strokeStyle = i % 3 === 0 ? 'rgba(86,92,58,0.16)' : 'rgba(255,255,255,0.28)';
-      g.lineWidth = 1;
+    var i;
+    // mottled ground: mossy and sun-bleached patches
+    for (i = 0; i < 150; i += 1) {
+      var px = hash(i, 3) * S;
+      var py = hash(i, 7) * S;
+      var pr = 3 + hash(i, 9) * 16;
+      var pg = g.createRadialGradient(px, py, 0, px, py, pr);
+      var dark = hash(i, 11) > 0.45;
+      pg.addColorStop(0, dark ? 'rgba(54,76,38,0.10)' : 'rgba(255,248,214,0.11)');
+      pg.addColorStop(1, 'rgba(90,110,60,0)');
+      g.fillStyle = pg;
+      g.beginPath();
+      g.arc(px, py, pr, 0, Math.PI * 2);
+      g.fill();
+    }
+    // fine grass blades
+    for (i = 0; i < 1250; i += 1) {
+      var x = hash(i, 13) * S;
+      var y = hash(i, 17) * S;
+      var len = 1.5 + hash(i, 19) * 5;
+      var lean = (hash(i, 23) - 0.5) * 4;
+      g.strokeStyle = i % 7 === 0
+        ? 'rgba(122,128,64,0.22)'
+        : (i % 3 === 0 ? 'rgba(40,64,30,0.20)' : 'rgba(214,228,168,0.28)');
+      g.lineWidth = 0.7 + hash(i, 29) * 0.8;
       g.beginPath();
       g.moveTo(x, y);
-      g.lineTo(x + (hash(i, 13) - 0.5) * 3, y - len);
+      g.quadraticCurveTo(x + lean * 0.4, y - len * 0.6, x + lean, y - len);
       g.stroke();
     }
-    for (var j = 0; j < 90; j += 1) {
-      g.fillStyle = 'rgba(120,104,72,0.10)';
+    // clover and broadleaf flecks
+    for (i = 0; i < 120; i += 1) {
+      var cx = hash(i, 31) * S;
+      var cy = hash(i, 37) * S;
+      g.fillStyle = i % 4 === 0 ? 'rgba(92,122,60,0.26)' : 'rgba(156,186,104,0.24)';
+      for (var k = 0; k < 3; k += 1) {
+        var a = k / 3 * Math.PI * 2 + hash(i, 41);
+        g.beginPath();
+        g.ellipse(cx + Math.cos(a) * 1.6, cy + Math.sin(a) * 1.6, 1.5, 1.1, a, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    // dry soil flecks and tiny stones
+    for (i = 0; i < 190; i += 1) {
+      var sx = hash(i, 43) * S;
+      var sy = hash(i, 47) * S;
+      g.fillStyle = i % 3 === 0 ? 'rgba(120,96,62,0.20)' : 'rgba(160,148,112,0.17)';
       g.beginPath();
-      g.arc(hash(j, 17) * S, hash(j, 19) * S, 1 + hash(j, 23) * 2, 0, Math.PI * 2);
+      g.ellipse(sx, sy, 0.7 + hash(i, 53) * 1.8, 0.5 + hash(i, 59) * 1.2, hash(i, 61) * 3, 0, Math.PI * 2);
       g.fill();
     }
   }
 
   function drawPathTexture(g, S) {
     g.clearRect(0, 0, S, S);
+    var i;
     var grad = g.createLinearGradient(0, 0, S, 0);
-    grad.addColorStop(0, 'rgba(168,135,94,0)');
-    grad.addColorStop(0.08, 'rgba(168,135,94,0.92)');
-    grad.addColorStop(0.5, 'rgba(185,151,106,0.98)');
-    grad.addColorStop(0.92, 'rgba(168,135,94,0.92)');
-    grad.addColorStop(1, 'rgba(168,135,94,0)');
+    grad.addColorStop(0, 'rgba(128,100,64,0)');
+    grad.addColorStop(0.05, 'rgba(128,100,64,0.72)');
+    grad.addColorStop(0.14, 'rgba(150,119,78,0.96)');
+    grad.addColorStop(0.5, 'rgba(166,133,89,0.99)');
+    grad.addColorStop(0.86, 'rgba(150,119,78,0.96)');
+    grad.addColorStop(0.95, 'rgba(128,100,64,0.72)');
+    grad.addColorStop(1, 'rgba(128,100,64,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, S, S);
-    // cart ruts
-    g.strokeStyle = 'rgba(110,82,52,0.16)';
-    g.lineWidth = 7;
-    g.beginPath();
-    g.moveTo(S * 0.32, 0); g.lineTo(S * 0.32, S);
-    g.moveTo(S * 0.68, 0); g.lineTo(S * 0.68, S);
-    g.stroke();
-    var palette = ['#A17F53', '#C3A173', '#98764C', '#D0B183', '#8C6A44'];
-    for (var i = 0; i < 120; i += 1) {
-      var x = S * 0.10 + hash(i, 101) * S * 0.80;
-      var y = hash(i, 103) * S;
-      g.fillStyle = palette[i % palette.length];
-      g.globalAlpha = 0.35 + hash(i, 107) * 0.45;
+    // broad damp / dry patches
+    for (i = 0; i < 34; i += 1) {
+      var bx = S * 0.12 + hash(i, 201) * S * 0.76;
+      var by = hash(i, 203) * S;
+      var br = 8 + hash(i, 207) * 30;
+      var bg = g.createRadialGradient(bx, by, 1, bx, by, br);
+      bg.addColorStop(0, i % 3 === 0 ? 'rgba(102,74,44,0.18)' : 'rgba(206,176,128,0.16)');
+      bg.addColorStop(1, 'rgba(150,120,80,0)');
+      g.fillStyle = bg;
       g.beginPath();
-      g.ellipse(x, y, 1.2 + hash(i, 109) * 3.4, 1 + hash(i, 113) * 2.2, hash(i, 127) * Math.PI, 0, Math.PI * 2);
+      g.arc(bx, by, br, 0, Math.PI * 2);
+      g.fill();
+    }
+    // wheel ruts with soft shoulders
+    for (var r = 0; r < 2; r += 1) {
+      var rx = S * (r ? 0.63 : 0.37);
+      g.strokeStyle = 'rgba(96,70,42,0.16)';
+      g.lineWidth = 15;
+      g.beginPath();
+      g.moveTo(rx, -2);
+      g.lineTo(rx, S + 2);
+      g.stroke();
+      g.strokeStyle = 'rgba(86,62,38,0.20)';
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(rx + 1.5, -2);
+      g.lineTo(rx + 1.5, S + 2);
+      g.stroke();
+      g.strokeStyle = 'rgba(206,178,132,0.13)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(rx - 7, -2);
+      g.lineTo(rx - 7, S + 2);
+      g.stroke();
+    }
+    // churned clods
+    var palette = ['#7E5F3C', '#94714A', '#B08A5A', '#C4A171', '#6E5234', '#A57D4E'];
+    for (i = 0; i < 210; i += 1) {
+      var x = S * 0.08 + hash(i, 101) * S * 0.84;
+      var y = hash(i, 103) * S;
+      var ew = 1.2 + hash(i, 109) * 5.2;
+      var eh = 1 + hash(i, 113) * 3.2;
+      g.fillStyle = palette[i % palette.length];
+      g.globalAlpha = 0.32 + hash(i, 107) * 0.42;
+      g.beginPath();
+      g.ellipse(x, y, ew, eh, hash(i, 127) * Math.PI, 0, Math.PI * 2);
+      g.fill();
+      if (i % 5 === 0) {
+        g.strokeStyle = 'rgba(74,54,32,0.22)';
+        g.lineWidth = 0.8;
+        g.stroke();
+      }
+    }
+    // compacted stones with a highlight
+    for (i = 0; i < 90; i += 1) {
+      var sx = S * 0.08 + hash(i, 211) * S * 0.84;
+      var sy = hash(i, 213) * S;
+      var sr = 1.2 + hash(i, 217) * 3.2;
+      g.globalAlpha = 0.72;
+      g.fillStyle = i % 4 === 0 ? '#8D7E68' : '#BCA98C';
+      g.beginPath();
+      g.ellipse(sx, sy, sr, sr * 0.7, hash(i, 219) * Math.PI, 0, Math.PI * 2);
+      g.fill();
+      g.globalAlpha = 0.55;
+      g.fillStyle = 'rgba(240,226,196,0.7)';
+      g.beginPath();
+      g.ellipse(sx - sr * 0.22, sy - sr * 0.25, sr * 0.5, sr * 0.3, hash(i, 219) * Math.PI, 0, Math.PI * 2);
       g.fill();
     }
     g.globalAlpha = 1;
-    for (var j = 0; j < 46; j += 1) {
-      var gx = hash(j, 131) < 0.5 ? S * 0.04 + hash(j, 137) * S * 0.12 : S * 0.84 + hash(j, 137) * S * 0.12;
+    // fine grit
+    for (i = 0; i < 1100; i += 1) {
+      var nx = S * 0.04 + hash(i, 221) * S * 0.92;
+      var ny = hash(i, 223) * S;
+      g.fillStyle = i % 5 === 0 ? 'rgba(64,46,28,0.24)' : 'rgba(226,204,164,0.22)';
+      g.fillRect(nx, ny, 0.8, 0.8);
+    }
+    // hairline cracks
+    for (i = 0; i < 12; i += 1) {
+      var cx2 = S * 0.16 + hash(i, 227) * S * 0.68;
+      var cy2 = hash(i, 229) * S;
+      g.strokeStyle = 'rgba(70,50,30,0.22)';
+      g.lineWidth = 0.9;
+      g.beginPath();
+      g.moveTo(cx2, cy2);
+      for (var c = 1; c <= 4; c += 1) {
+        g.lineTo(cx2 + (hash(i * 7 + c, 231) - 0.5) * 15, cy2 + c * 4 + hash(c, 233) * 4);
+      }
+      g.stroke();
+    }
+    // grass creeping in from both edges
+    for (var j = 0; j < 110; j += 1) {
+      var left = j % 2 === 0;
+      var gx = left ? S * 0.02 + hash(j, 137) * S * 0.14 : S * 0.84 + hash(j, 137) * S * 0.14;
       var gy = hash(j, 139) * S;
-      g.strokeStyle = 'rgba(74,110,52,0.46)';
-      g.lineWidth = 1.4;
+      var gh = 4 + hash(j, 151) * 11;
+      g.strokeStyle = j % 3 === 0 ? 'rgba(74,110,52,0.58)' : 'rgba(96,132,62,0.50)';
+      g.lineWidth = 1.1 + hash(j, 157) * 1.1;
       g.beginPath();
       g.moveTo(gx, gy);
-      g.lineTo(gx + (hash(j, 149) - 0.5) * 7, gy - 4 - hash(j, 151) * 8);
+      g.quadraticCurveTo(gx + (left ? 3 : -3), gy - gh * 0.55, gx + (hash(j, 149) - 0.5) * 9, gy - gh);
       g.stroke();
     }
   }
@@ -1200,8 +1008,11 @@
         sampleColor(vx, vy).convertSRGBToLinear();
         var n = 0.92 + hash(vx, vy) * 0.16;
         var tint = 1 + (hash(vx + 23, vy + 7) - 0.5) * 0.05;
-        colors.push(c.r * n * tint, c.g * n, c.b * n / tint);
-        uvs.push(vx * TILE / 7, vy * TILE / 7);
+        var macro = 1 + Math.sin(vx * 0.31 + vy * 0.17) * 0.05 +
+          Math.sin(vx * 0.11 - vy * 0.23 + 1.7) * 0.04 +
+          (hash(Math.floor(vx / 4) + 53, Math.floor(vy / 4) + 31) - 0.5) * 0.10;
+        colors.push(c.r * n * tint * macro * 0.94, c.g * n * macro * 0.97, c.b * n / tint * 0.88);
+        uvs.push(vx * TILE / 5, vy * TILE / 5);
       }
     }
     for (var ty = 0; ty < ROWS; ty += 1) {
@@ -1260,7 +1071,7 @@
         var t = s / steps;
         var cx = ax + dx * t;
         var cz = az + dz * t;
-        var half = 2.45 + Math.sin(t * 9 + p * 2.3) * 0.12;
+        var half = 1.82 + Math.sin(t * 9 + p * 2.3) * 0.09;
         var lx = cx + nx * half;
         var lz = cz + nz * half;
         var rx = cx - nx * half;
@@ -1292,18 +1103,6 @@
     });
     scene.add(new THREE.Mesh(geo, mat));
 
-    var plazaGeo = new THREE.CircleBufferGeometry(3.5, 40);
-    plazaGeo.rotateX(-Math.PI / 2);
-    var plaza = new THREE.Mesh(plazaGeo, new THREE.MeshLambertMaterial({
-      map: getWorldTexture('plaza', drawPlazaTexture),
-      transparent: true,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      side: THREE.DoubleSide
-    }));
-    plaza.position.set(20.5 * TILE, terrainHeightAt(20.5 * TILE, 31.5 * TILE) + 0.06, 31.5 * TILE);
-    scene.add(plaza);
   }
 
 
@@ -1641,10 +1440,64 @@
     return sprite;
   }
 
+  function buildingUnlocked(type) {
+    if (type === 'shrine') return true;
+    return !!(window.Core && window.Core.isUnlocked(type));
+  }
+
+  function buildLockedPlot(b) {
+    var parts = [];
+    var halfW = b.w * TILE / 2;
+    var halfH = b.h * TILE / 2;
+    var inset = 0.9;
+    var post = '#A98B62';
+    var rope = '#D9C49C';
+    var corners = [
+      [-halfW + inset, -halfH + inset], [halfW - inset, -halfH + inset],
+      [halfW - inset, halfH - inset], [-halfW + inset, halfH - inset]
+    ];
+    for (var c = 0; c < corners.length; c += 1) {
+      parts.push(box(0.26, 1.5, 0.26, post, corners[c][0], 0.75, corners[c][1]));
+      parts.push(box(0.44, 0.12, 0.44, '#8A6A46', corners[c][0], 1.52, corners[c][1]));
+    }
+    for (var e = 0; e < 4; e += 1) {
+      var a = corners[e];
+      var d = corners[(e + 1) % 4];
+      var mx = (a[0] + d[0]) / 2;
+      var mz = (a[1] + d[1]) / 2;
+      var lenX = Math.abs(d[0] - a[0]);
+      var lenZ = Math.abs(d[1] - a[1]);
+      if (lenX > 0.1) parts.push(box(lenX, 0.06, 0.06, rope, mx, 1.34, a[1]));
+      if (lenZ > 0.1) parts.push(box(0.06, 0.06, lenZ, rope, a[0], 1.34, mz));
+    }
+    parts.push(box(3.1, 0.12, 1.7, '#B9A47E', 0, 0.06, 0));
+    parts.push(cyl(0.09, 0.12, 2.2, 6, '#7A5A3A', 0, 1.1, 0));
+    parts.push(box(2.0, 0.9, 0.12, '#E7D6B2', 0, 2.05, 0));
+    parts.push(box(2.2, 0.12, 0.2, '#8A6A46', 0, 2.5, 0));
+    parts.push(box(1.5, 0.07, 0.06, '#B57A3E', 0, 2.04, -0.07));
+    parts.push(box(1.5, 0.07, 0.06, '#B57A3E', 0, 1.92, -0.07));
+    parts.push(box(1.5, 0.07, 0.06, '#B57A3E', 0, 1.8, -0.07));
+    var mesh = makeMergedMesh(parts);
+    mesh.position.set(b.centerX, terrainHeightAt(b.centerX, b.centerZ), b.centerZ);
+    scene.add(mesh);
+    buildingMeshes.push(mesh);
+    b.labelY = 3.6;
+  }
+
   function buildBuildingLabels() {
     for (var i = 0; i < map.buildings.length; i += 1) {
       var b = map.buildings[i];
-      var sprite = makeTextSprite(b.name, { stroke: '#A97142', scaleX: 3.2, scaleY: 0.8 });
+      b.locked = !buildingUnlocked(b.type);
+      var sprite;
+      if (b.locked) {
+        sprite = makeTextSprite(b.name + ' · 可建设', {
+          bg: 'rgba(16,22,28,0.90)', color: '#EAD9B4', stroke: '#7A5A32', scaleX: 4.0, scaleY: 0.9
+        });
+      } else {
+        sprite = makeTextSprite(b.name, {
+          bg: 'rgba(255,250,238,0.94)', color: '#3A3028', stroke: '#A97142', scaleX: 3.2, scaleY: 0.8
+        });
+      }
       if (!sprite) continue;
       sprite.position.set(b.centerX, terrainHeightAt(b.centerX, b.centerZ) + b.labelY, b.centerZ);
       scene.add(sprite);
@@ -1656,12 +1509,52 @@
   function buildBuildings() {
     for (var i = 0; i < map.buildings.length; i += 1) {
       var b = map.buildings[i];
+      var unlocked = buildingUnlocked(b.type);
+      b.locked = !unlocked;
       if (b.type === 'shrine') buildShrine(b);
+      else if (!unlocked) buildLockedPlot(b);
       else if (b.type === 'shop') buildShop(b);
       else if (b.type === 'house') buildHouse(b);
       else if (b.type === 'farm') buildFarm(b);
     }
     buildBuildingLabels();
+  }
+
+  function refreshBuildings() {
+    if (!initialized || !scene) return;
+    var i;
+    for (i = 0; i < buildingMeshes.length; i += 1) {
+      var mesh = buildingMeshes[i];
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) {
+        if (mesh.material.map) mesh.material.map.dispose();
+        mesh.material.dispose();
+      }
+    }
+    buildingMeshes.length = 0;
+    for (i = 0; i < buildingLabels.length; i += 1) {
+      var label = buildingLabels[i];
+      scene.remove(label);
+      if (label.material) {
+        if (label.material.map) label.material.map.dispose();
+        label.material.dispose();
+      }
+    }
+    buildingLabels.length = 0;
+    for (i = 0; i < map.buildings.length; i += 1) {
+      var b = map.buildings[i];
+      if (b.rune) {
+        scene.remove(b.rune);
+        if (b.rune.material) b.rune.material.dispose();
+        if (b.rune.geometry) b.rune.geometry.dispose();
+        b.rune = null;
+      }
+      b.labelSprite = null;
+    }
+    buildBuildings();
+    updateNearby();
+    drawMinimap();
   }
 
   /* ---------------- 场景物件 ---------------- */
@@ -1676,40 +1569,126 @@
   var SHADOW_SIZE = {
     treeA: 2.8, treeB: 2.3, treeC: 2.2, bush: 1.3, rock: 1.5, log: 1.5,
     stump: 1.1, bench: 1.2, lantern: 0.55, stoneMarker: 0.6, fern: 0.55,
-    reed: 0.45
+    reed: 0.45, grass: 0.62, flower: 0.48, mushroom: 0.36, pebble: 0.30
   };
   var sceneryGeometries = {};
 
   function drawGrassTuft(g, S) {
     g.clearRect(0, 0, S, S);
-    var colors = ['#5F9A5D', '#76B06A', '#8CC47A', '#4F8A55', '#A5D18A'];
-    for (var i = 0; i < 16; i += 1) {
-      var x = S * 0.5 + (hash(i, 307) - 0.5) * S * 0.58;
-      var base = S * 0.96;
-      var h = S * (0.30 + hash(i, 311) * 0.55);
-      var lean = (hash(i, 313) - 0.5) * S * 0.32;
+    var baseY = S * 0.97;
+    var dark = ['#2E5532', '#386339', '#416F3D', '#4C7C43'];
+    var mid = ['#588C4A', '#659B51', '#72A85A', '#80B463'];
+    var light = ['#8FC273', '#9CCF80', '#ACD98D'];
+    var i;
+    var shadow = g.createRadialGradient(S * 0.5, baseY, 1, S * 0.5, baseY, S * 0.40);
+    shadow.addColorStop(0, 'rgba(28,42,24,0.28)');
+    shadow.addColorStop(1, 'rgba(28,42,24,0)');
+    g.fillStyle = shadow;
+    g.beginPath();
+    g.ellipse(S * 0.5, baseY, S * 0.39, S * 0.10, 0, 0, Math.PI * 2);
+    g.fill();
+    // back layer: darker, shorter blades
+    for (i = 0; i < 26; i += 1) {
+      var bx = S * 0.5 + (hash(i, 301) - 0.5) * S * 0.76;
+      var bh = S * (0.26 + hash(i, 303) * 0.44);
+      var bl = (hash(i, 305) - 0.5) * S * 0.34;
+      var bw = 3.0 + hash(i, 307) * 3.6;
       g.beginPath();
-      g.moveTo(x - 4, base);
-      g.quadraticCurveTo(x + lean * 0.2, base - h * 0.55, x + lean, base - h);
-      g.quadraticCurveTo(x + lean * 0.2 + 4, base - h * 0.45, x + 4, base);
+      g.moveTo(bx - bw, baseY);
+      g.quadraticCurveTo(bx + bl * 0.25, baseY - bh * 0.58, bx + bl, baseY - bh);
+      g.quadraticCurveTo(bx + bl * 0.2 + bw, baseY - bh * 0.5, bx + bw, baseY);
       g.closePath();
-      g.fillStyle = colors[i % colors.length];
-      g.globalAlpha = 0.72 + hash(i, 317) * 0.28;
+      g.fillStyle = dark[i % dark.length];
+      g.globalAlpha = 0.68 + hash(i, 309) * 0.24;
       g.fill();
+    }
+    // main layer: blades fanning out naturally
+    for (i = 0; i < 42; i += 1) {
+      var mx = S * 0.5 + (hash(i, 311) - 0.5) * S * 0.68;
+      var mh = S * (0.38 + hash(i, 313) * 0.47);
+      var ml = (hash(i, 317) - 0.5) * S * 0.44;
+      var mw = 2.6 + hash(i, 319) * 3.6;
+      g.beginPath();
+      g.moveTo(mx - mw, baseY);
+      g.bezierCurveTo(mx - mw * 0.4, baseY - mh * 0.35, mx + ml * 0.55, baseY - mh * 0.72, mx + ml, baseY - mh);
+      g.bezierCurveTo(mx + ml * 0.5 + mw * 0.3, baseY - mh * 0.60, mx + mw * 0.6, baseY - mh * 0.28, mx + mw, baseY);
+      g.closePath();
+      g.fillStyle = mid[i % mid.length];
+      g.globalAlpha = 0.82 + hash(i, 321) * 0.18;
+      g.fill();
+    }
+    // front highlight blades
+    for (i = 0; i < 14; i += 1) {
+      var fx = S * 0.5 + (hash(i, 323) - 0.5) * S * 0.55;
+      var fh = S * (0.25 + hash(i, 327) * 0.38);
+      var fl = (hash(i, 329) - 0.5) * S * 0.32;
+      g.strokeStyle = light[i % light.length];
+      g.globalAlpha = 0.55 + hash(i, 331) * 0.3;
+      g.lineWidth = 1.4 + hash(i, 337) * 1.4;
+      g.beginPath();
+      g.moveTo(fx, baseY - 2);
+      g.quadraticCurveTo(fx + fl * 0.3, baseY - fh * 0.6, fx + fl, baseY - fh);
+      g.stroke();
+    }
+    // seed heads
+    for (i = 0; i < 6; i += 1) {
+      var sx = S * 0.5 + (hash(i, 339) - 0.5) * S * 0.48;
+      var sh = S * (0.48 + hash(i, 341) * 0.34);
+      var sl = (hash(i, 343) - 0.5) * S * 0.22;
+      g.strokeStyle = 'rgba(126,148,86,0.80)';
+      g.lineWidth = 1.2;
+      g.beginPath();
+      g.moveTo(sx, baseY - 4);
+      g.quadraticCurveTo(sx + sl * 0.4, baseY - sh * 0.65, sx + sl, baseY - sh);
+      g.stroke();
+      g.fillStyle = 'rgba(176,178,112,0.82)';
+      g.beginPath();
+      g.ellipse(sx + sl, baseY - sh - 2, 2.4, 5.2, sl * 0.01, 0, Math.PI * 2);
+      g.fill();
+    }
+    // broad ground-hugging leaves hide the stalky base
+    for (i = 0; i < 14; i += 1) {
+      var gx2 = S * 0.5 + (hash(i, 357) - 0.5) * S * 0.64;
+      var gy2 = baseY - 2;
+      var gw = 10 + hash(i, 359) * 18;
+      var gl = (hash(i, 361) - 0.5) * 0.9;
+      g.fillStyle = i % 2 === 0 ? 'rgba(63,103,53,0.92)' : 'rgba(79,122,62,0.88)';
+      g.beginPath();
+      g.ellipse(gx2, gy2 - 3, gw * 0.5, 3.2 + hash(i, 367) * 2.6, gl, 0, Math.PI * 2);
+      g.fill();
+    }
+    // a few dry blades for natural variation
+    for (i = 0; i < 5; i += 1) {
+      var dx = S * 0.5 + (hash(i, 347) - 0.5) * S * 0.62;
+      var dh = S * (0.18 + hash(i, 349) * 0.28);
+      var dl = (hash(i, 353) - 0.5) * S * 0.30;
+      g.strokeStyle = 'rgba(166,146,86,0.60)';
+      g.lineWidth = 1.3;
+      g.beginPath();
+      g.moveTo(dx, baseY - 2);
+      g.quadraticCurveTo(dx + dl * 0.5, baseY - dh * 0.7, dx + dl, baseY - dh);
+      g.stroke();
     }
     g.globalAlpha = 1;
   }
 
   function crossGrassGeometry() {
-    var planes = [new THREE.PlaneBufferGeometry(1.30, 0.84), new THREE.PlaneBufferGeometry(1.30, 0.84)];
-    planes[1].rotateY(Math.PI / 2);
+    var planes = [
+      new THREE.PlaneBufferGeometry(1.78, 1.14),
+      new THREE.PlaneBufferGeometry(1.78, 1.14),
+      new THREE.PlaneBufferGeometry(1.78, 1.14),
+      new THREE.PlaneBufferGeometry(1.78, 1.14)
+    ];
+    planes[1].rotateY(Math.PI / 4);
+    planes[2].rotateY(Math.PI / 2);
+    planes[3].rotateY(Math.PI * 3 / 4);
     var positions = [];
     var uvs = [];
     var indices = [];
     var offset = 0;
     for (var p = 0; p < planes.length; p += 1) {
       var g = planes[p];
-      g.translate(0, 0.42, 0);
+      g.translate(0, 0.56, 0);
       var pos = g.attributes.position.array;
       var uv = g.attributes.uv.array;
       var idx = g.index.array;
@@ -1738,60 +1717,165 @@
       return grassGeo;
     }
     if (variant === 'treeA') {
-      parts.push(cyl(0.24, 0.38, 2.7, 7, wood, 0, 1.35, 0));
-      parts.push(cyl(0.09, 0.15, 1.4, 5, wood, -0.36, 2.45, 0.08, 0, 0, -0.55));
-      parts.push(cyl(0.08, 0.13, 1.3, 5, wood, 0.38, 2.35, -0.08, 0, 0, 0.6));
+      parts.push(cyl(0.22, 0.42, 2.9, 8, wood, 0, 1.45, 0));
+      parts.push(cyl(0.09, 0.17, 1.5, 5, wood, -0.38, 2.55, 0.08, 0, 0, -0.52));
+      parts.push(cyl(0.08, 0.15, 1.4, 5, wood, 0.40, 2.45, -0.08, 0, 0, 0.58));
+      parts.push(cyl(0.05, 0.10, 1.0, 4, wood, 0.12, 3.15, 0.34, 0.55, 0, 0.2));
+      parts.push(cone(0.28, 0.7, 5, wood, -0.55, 0.17, 0.12, 0.5));
+      parts.push(cone(0.24, 0.6, 5, wood, 0.50, 0.15, -0.10, -0.4));
+      parts.push(cone(0.20, 0.5, 5, wood, 0.06, 0.14, 0.45, 0.15));
       var canopy = [
-        [0, 3.8, 0, 1.45, 1.25, 1.4, leaf[2], 0.2, 0.4, 0.2],
-        [-0.95, 3.25, 0.3, 1.15, 1.0, 1.05, leaf[1], 0.4, 1.1, 0.3],
-        [0.95, 3.35, -0.2, 1.2, 1.05, 1.15, leaf[3], 0.3, 2.0, 0.2],
-        [0.15, 4.55, 0.1, 0.92, 0.82, 0.9, leaf[4], 0.5, 0.8, 0.4],
-        [-0.5, 4.15, -0.45, 0.85, 0.78, 0.82, leaf[3], 0.2, 1.6, 0.5],
-        [0.6, 4.2, 0.45, 0.82, 0.72, 0.8, leaf[2], 0.4, 2.7, 0.1]
+        [0, 4.05, 0, 1.32, 1.16, 1.28, 2],
+        [-1.08, 3.58, 0.32, 1.05, 0.92, 1.00, 2],
+        [1.06, 3.62, -0.24, 1.08, 0.95, 1.04, 1],
+        [0.18, 4.68, 0.08, 0.95, 0.84, 0.92, 1],
+        [-0.62, 4.42, -0.48, 0.80, 0.72, 0.76, 1],
+        [0.70, 4.46, 0.45, 0.78, 0.70, 0.74, 1],
+        [-1.38, 4.14, -0.12, 0.70, 0.64, 0.68, 1],
+        [1.34, 4.08, 0.20, 0.72, 0.66, 0.68, 1],
+        [0.02, 3.42, 0.84, 0.75, 0.64, 0.70, 0],
+        [0.02, 3.38, -0.88, 0.80, 0.66, 0.72, 0],
+        [-0.42, 3.16, -0.30, 0.70, 0.56, 0.62, 0],
+        [0.90, 3.90, 0.42, 0.66, 0.58, 0.64, 1],
+        [-0.94, 4.75, 0.26, 0.58, 0.52, 0.56, 0],
+        [0.38, 5.02, -0.20, 0.54, 0.48, 0.52, 0],
+        [-0.20, 4.90, 0.52, 0.50, 0.44, 0.48, 0]
       ];
       for (var i = 0; i < canopy.length; i += 1) {
         var c = canopy[i];
-        parts.push(part(new THREE.IcosahedronBufferGeometry(1, 0), c[6], c[0], c[1], c[2], c[7], c[8], c[9], c[3], c[4], c[5]));
+        parts.push(part(
+          new THREE.IcosahedronBufferGeometry(1, c[6] || 1),
+          leaf[(i % 3) + (c[6] ? 2 : 0)],
+          c[0], c[1], c[2],
+          (hash(i, 401) - 0.5) * 0.35,
+          hash(i, 403) * Math.PI,
+          (hash(i, 407) - 0.5) * 0.35,
+          c[3], c[4], c[5]
+        ));
       }
-      parts.push(cone(0.16, 0.55, 5, wood, -0.42, 0.24, 0.15, 0.4));
-      parts.push(cone(0.14, 0.45, 5, wood, 0.42, 0.2, -0.12, -0.4));
-      parts.push(sphere(0.11, 5, '#E8B45A', 0.95, 3.75, 0.62));
-      parts.push(sphere(0.1, 5, '#E8B45A', -0.82, 3.9, -0.35));
-      parts.push(sphere(0.09, 5, '#D96A7A', 0.42, 4.55, 0.7));
+      // smaller outer clumps break the silhouette
+      for (var e = 0; e < 20; e += 1) {
+        var ea = e / 20 * Math.PI * 2 + 0.3;
+        var er = 1.15 + hash(e, 411) * 0.48;
+        parts.push(part(
+          new THREE.IcosahedronBufferGeometry(0.38 + hash(e, 413) * 0.22, 0),
+          leaf[1 + (e % 4)],
+          Math.cos(ea) * er, 3.55 + hash(e, 417) * 1.15, Math.sin(ea) * er,
+          0, ea, 0.3, 1.05, 0.85, 0.95
+        ));
+      }
+      // bright leaf sprays on top
+      for (var l = 0; l < 9; l += 1) {
+        var la = hash(l, 419) * Math.PI * 2;
+        var lr = 0.4 + hash(l, 421) * 1.05;
+        parts.push(part(
+          new THREE.IcosahedronBufferGeometry(0.26 + hash(l, 423) * 0.12, 0),
+          leaf[4],
+          Math.cos(la) * lr, 4.35 + hash(l, 427) * 0.7, Math.sin(la) * lr,
+          0.4, la, 0, 1.3, 0.38, 0.9
+        ));
+      }
+      parts.push(sphere(0.10, 5, '#E8B45A', 0.95, 3.85, 0.58));
+      parts.push(sphere(0.09, 5, '#E8B45A', -0.80, 4.0, -0.32));
+      parts.push(sphere(0.08, 5, '#D96A7A', 0.40, 4.55, 0.68));
+      parts.push(sphere(0.07, 5, '#D96A7A', -1.1, 3.7, 0.55));
     } else if (variant === 'treeB') {
-      parts.push(cyl(0.2, 0.32, 3.2, 7, '#6B4A33', 0, 1.6, 0));
-      parts.push(cone(1.85, 2.3, 7, leaf[0], 0, 2.5, 0, 0.15));
-      parts.push(cone(1.55, 2.0, 7, leaf[1], 0, 3.35, 0, -0.15));
-      parts.push(cone(1.25, 1.8, 7, leaf[2], 0, 4.1, 0, 0.25));
-      parts.push(cone(0.9, 1.55, 7, leaf[3], 0, 4.85, 0, -0.2));
-      parts.push(cone(0.52, 1.15, 7, leaf[4], 0, 5.55, 0, 0.15));
-    } else if (variant === 'treeC') {
-      parts.push(cyl(0.2, 0.32, 1.8, 6, '#9A7A52', 0, 0.9, 0, 0, 0, 0.16));
-      parts.push(cyl(0.16, 0.23, 1.5, 6, '#9A7A52', 0.18, 2.15, 0, 0, 0, 0.28));
-      parts.push(cyl(0.12, 0.18, 1.35, 6, '#9A7A52', 0.48, 3.25, 0, 0, 0, 0.42));
-      var crown = { x: 0.72, y: 3.95, z: 0 };
-      for (var p = 0; p < 7; p += 1) {
-        var a = p / 7 * Math.PI * 2;
-        var cx = crown.x + Math.cos(a) * 0.95;
-        var cz = crown.z + Math.sin(a) * 0.95;
-        parts.push(part(new THREE.BoxBufferGeometry(0.16, 0.08, 2.0), p % 2 ? leaf[2] : leaf[1], crown.x + Math.cos(a) * 0.55, crown.y - 0.12, crown.z + Math.sin(a) * 0.55, 0.35, -a, -0.15));
+      parts.push(cyl(0.18, 0.34, 3.5, 7, '#6B4A33', 0, 1.75, 0));
+      parts.push(cone(0.46, 0.8, 6, '#5A3E2A', 0, 0.28, 0, 0.4));
+      for (var pn = 0; pn < 9; pn += 1) {
+        var py = 1.55 + pn * 0.48;
+        var pr = 1.90 - pn * 0.165 + Math.sin(pn * 1.7) * 0.07;
+        var pc = leaf[Math.min(leaf.length - 1, 1 + (pn % 4))];
+        parts.push(part(
+          new THREE.ConeBufferGeometry(pr, 1.28 + pn * 0.03, 8),
+          pc, 0.03 * Math.sin(pn * 2.1), py, 0.03 * Math.cos(pn * 1.3),
+          0, pn * 0.7, 0,
+          1.0, 1.0, 0.93
+        ));
+        if (pn < 5) {
+          var ba = pn * 1.3 + 0.4;
+          parts.push(part(
+            new THREE.ConeBufferGeometry(0.30, 1.1, 5),
+            leaf[0], Math.cos(ba) * (pr * 0.72), py - 0.18, Math.sin(ba) * (pr * 0.72),
+            0.55, -ba, 0
+          ));
+        }
       }
-      parts.push(sphere(0.17, 6, '#5A3E26', crown.x + 0.2, crown.y - 0.25, 0.2));
-      parts.push(sphere(0.15, 6, '#5A3E26', crown.x - 0.15, crown.y - 0.3, -0.15));
+      parts.push(cone(0.42, 1.1, 6, leaf[4], 0, 5.85, 0));
+      parts.push(sphere(0.11, 5, '#E8B45A', 0.9, 4.2, 0.45));
+    } else if (variant === 'treeC') {
+      parts.push(cyl(0.20, 0.34, 1.9, 6, '#9A7A52', 0, 0.95, 0, 0, 0, 0.14));
+      parts.push(cyl(0.16, 0.24, 1.6, 6, '#9A7A52', 0.16, 2.18, 0, 0, 0, 0.27));
+      parts.push(cyl(0.12, 0.18, 1.5, 6, '#9A7A52', 0.44, 3.28, 0, 0, 0, 0.40));
+      parts.push(cyl(0.09, 0.14, 1.1, 5, '#9A7A52', 0.72, 4.15, 0, 0, 0, 0.50));
+      var crownX = 0.82;
+      var crownY = 4.52;
+      for (var f = 0; f < 10; f += 1) {
+        var fa = f / 10 * Math.PI * 2 + 0.12;
+        var reach = 1.35 + (f % 3) * 0.14;
+        for (var seg = 0; seg < 4; seg += 1) {
+          var sr = 0.34 + seg * 0.31;
+          var sy = crownY - seg * seg * 0.10;
+          var skin = leaf[1 + ((f + seg) % 4)];
+          parts.push(part(
+            new THREE.IcosahedronBufferGeometry(1, 0),
+            skin,
+            crownX + Math.cos(fa) * sr, sy, Math.sin(fa) * sr,
+            0, -fa, -0.40 - seg * 0.08,
+            0.42 + seg * 0.10, 0.075, 0.16 - seg * 0.02
+          ));
+          parts.push(part(
+            new THREE.IcosahedronBufferGeometry(1, 0),
+            skin,
+            crownX + Math.cos(fa + 0.12) * (sr + 0.1), sy - 0.12, Math.sin(fa + 0.12) * (sr + 0.1),
+            0, -fa, -0.55,
+            0.30, 0.06, 0.13
+          ));
+        }
+        parts.push(part(
+          new THREE.ConeBufferGeometry(0.11, 0.55, 4),
+          leaf[2],
+          crownX + Math.cos(fa) * reach, crownY - 0.62, Math.sin(fa) * reach,
+          Math.PI / 2.3, -fa, 0
+        ));
+      }
+      parts.push(sphere(0.20, 7, '#6B4A28', crownX + 0.24, crownY - 0.32, 0.18));
+      parts.push(sphere(0.18, 7, '#5A3E22', crownX - 0.18, crownY - 0.38, -0.12));
+      parts.push(sphere(0.16, 7, '#7A5530', crownX + 0.02, crownY - 0.30, -0.30));
     } else if (variant === 'bush') {
       var bush = [
-        [0, 0.55, 0, 0.72, 0.56, 0.66, leaf[1]],
-        [0.48, 0.45, 0.12, 0.55, 0.44, 0.52, leaf[2]],
-        [-0.42, 0.4, -0.1, 0.5, 0.38, 0.46, leaf[0]],
-        [0.08, 0.88, 0.02, 0.44, 0.34, 0.42, leaf[3]]
+        [0, 0.58, 0, 0.78, 0.60, 0.70, 1],
+        [0.52, 0.44, 0.12, 0.58, 0.46, 0.54, 0],
+        [-0.46, 0.42, -0.10, 0.54, 0.42, 0.50, 0],
+        [0.10, 0.94, 0.02, 0.50, 0.38, 0.46, 0],
+        [0.72, 0.78, -0.14, 0.42, 0.34, 0.40, 1],
+        [-0.68, 0.72, 0.16, 0.40, 0.32, 0.38, 1],
+        [0.32, 0.36, 0.44, 0.38, 0.30, 0.36, 0],
+        [-0.22, 0.32, -0.44, 0.36, 0.28, 0.34, 1]
       ];
       for (var b = 0; b < bush.length; b += 1) {
         var bb = bush[b];
-        parts.push(part(new THREE.IcosahedronBufferGeometry(1, 0), bb[6], bb[0], bb[1], bb[2], 0.3, b, 0.2, bb[3], bb[4], bb[5]));
+        parts.push(part(
+          new THREE.IcosahedronBufferGeometry(1, bb[6] ? 1 : 0),
+          leaf[(b % 4) + (bb[6] ? 1 : 0)],
+          bb[0], bb[1], bb[2],
+          (hash(b, 431) - 0.5) * 0.3, b, 0.2,
+          bb[3], bb[4], bb[5]
+        ));
       }
-      parts.push(sphere(0.07, 5, '#D96A7A', 0.28, 0.75, 0.23));
-      parts.push(sphere(0.06, 5, '#D96A7A', -0.2, 0.7, 0.3));
-      parts.push(sphere(0.05, 5, '#F2C94C', 0.42, 0.62, -0.15));
+      for (var bl = 0; bl < 8; bl += 1) {
+        var ba2 = bl / 8 * Math.PI * 2;
+        parts.push(part(
+          new THREE.IcosahedronBufferGeometry(0.22, 0),
+          leaf[4],
+          Math.cos(ba2) * 0.62, 0.80 + hash(bl, 433) * 0.20, Math.sin(ba2) * 0.55,
+          0.5, ba2, 0, 1.4, 0.35, 0.8
+        ));
+      }
+      parts.push(sphere(0.08, 5, '#D96A7A', 0.30, 0.78, 0.25));
+      parts.push(sphere(0.07, 5, '#D96A7A', -0.22, 0.72, 0.33));
+      parts.push(sphere(0.07, 5, '#F2C94C', 0.44, 0.64, -0.16));
+      parts.push(sphere(0.06, 5, '#F7F1E0', -0.5, 0.82, 0.08));
     } else if (variant === 'rock') {
       parts.push(part(new THREE.DodecahedronBufferGeometry(1, 0), '#8A98A6', 0, 0.52, 0, 0.1, 0.4, 0.05, 1.2, 0.82, 1.0));
       parts.push(part(new THREE.IcosahedronBufferGeometry(0.58, 0), '#A8B3BF', 0.68, 0.3, 0.18, 0.2, 1.1, 0.1, 1.0, 0.75, 0.9));
@@ -1800,26 +1884,66 @@
       parts.push(sphere(0.07, 5, '#6B8A52', -0.4, 0.55, 0.3));
     } else if (variant === 'flower') {
       var flowerColors = ['#E86A8A', '#F2C94C', '#B97AD9', '#F28C6A', '#F7F1E0'];
-      for (var f = 0; f < 3; f += 1) {
-        var fx = (f - 1) * 0.26;
-        var fz = f % 2 === 0 ? 0.07 : -0.06;
-        var fh = 0.55 + f * 0.12;
-        parts.push(cyl(0.025, 0.035, fh, 4, '#4F8A55', fx, fh / 2, fz));
-        parts.push(part(new THREE.SphereBufferGeometry(0.12, 6, 5), '#4F8A55', fx - 0.09, 0.22, fz + 0.02, 0, 0, 0.4, 1.4, 0.35, 0.8));
-        var fc = flowerColors[(f + 1) % flowerColors.length];
-        for (var pt = 0; pt < 5; pt += 1) {
-          var pa = pt / 5 * Math.PI * 2;
-          parts.push(sphere(0.065, 6, fc, fx + Math.cos(pa) * 0.12, fh + Math.sin(pa) * 0.03, fz + Math.sin(pa) * 0.12, 1.2, 0.5, 1.2));
+      var heads = [
+        { x: -0.30, z: 0.06, h: 0.62, c: 0 },
+        { x: 0.02, z: -0.08, h: 0.86, c: 1 },
+        { x: 0.32, z: 0.10, h: 0.72, c: 2 },
+        { x: 0.12, z: 0.24, h: 0.48, c: 3 }
+      ];
+      for (var f = 0; f < heads.length; f += 1) {
+        var hd = heads[f];
+        var fc2 = flowerColors[(hd.c + f) % flowerColors.length];
+        parts.push(part(
+          new THREE.CylinderBufferGeometry(0.018, 0.028, hd.h, 4),
+          '#4F8A55', hd.x, hd.h / 2, hd.z,
+          (hash(f, 441) - 0.5) * 0.22, 0, (hash(f, 443) - 0.5) * 0.22
+        ));
+        // leaves
+        for (var lf = 0; lf < 2; lf += 1) {
+          var lfa = hash(f * 3 + lf, 447) * Math.PI * 2;
+          parts.push(part(
+            new THREE.SphereBufferGeometry(1, 6, 4),
+            '#4F8A55',
+            hd.x + Math.cos(lfa) * 0.14, 0.20 + lf * 0.09, hd.z + Math.sin(lfa) * 0.14,
+            0.15, -lfa, 0.55,
+            0.19, 0.028, 0.10
+          ));
         }
-        parts.push(sphere(0.07, 6, '#F2C94C', fx, fh + 0.02, fz, 1, 0.6, 1));
+        var topY = hd.h + 0.03;
+        for (var pt = 0; pt < 7; pt += 1) {
+          var pa = pt / 7 * Math.PI * 2 + f * 0.3;
+          parts.push(part(
+            new THREE.SphereBufferGeometry(1, 6, 4),
+            fc2,
+            hd.x + Math.cos(pa) * 0.105, topY, hd.z + Math.sin(pa) * 0.105,
+            -0.45, -pa, 0,
+            0.115, 0.038, 0.072
+          ));
+        }
+        parts.push(sphere(0.055, 6, '#F2C94C', hd.x, topY + 0.02, hd.z, 1.0, 0.7, 1.0));
       }
+      // unopened bud
+      parts.push(cyl(0.015, 0.02, 0.52, 4, '#4F8A55', -0.42, 0.26, -0.02));
+      parts.push(sphere(0.075, 6, '#D96A7A', -0.42, 0.58, -0.02, 0.8, 1.3, 0.8));
+      parts.push(sphere(0.06, 5, '#5F9A5D', -0.42, 0.50, -0.02, 1.5, 0.35, 1.2));
     } else if (variant === 'fern') {
-      for (var q = 0; q < 6; q += 1) {
-        var qa = q / 6 * Math.PI * 2 + 0.2;
-        var qh = 0.55 + (q % 3) * 0.12;
-        parts.push(part(new THREE.BoxBufferGeometry(0.07, 0.03, qh), leaf[1], Math.cos(qa) * 0.22, 0.18 + qh * 0.35, Math.sin(qa) * 0.22, 0.5, -qa, 0.12));
+      for (var q = 0; q < 9; q += 1) {
+        var qa = q / 9 * Math.PI * 2 + 0.2;
+        var qreach = 0.58 + (q % 3) * 0.08;
+        for (var qs = 0; qs < 4; qs += 1) {
+          var qd = qs / 3 * qreach;
+          var qh = 0.18 + qs * 0.075;
+          parts.push(part(
+            new THREE.IcosahedronBufferGeometry(1, 0),
+            leaf[(q + qs) % 4],
+            Math.cos(qa) * qd, qh, Math.sin(qa) * qd,
+            0.35, -qa, 0.45 + qs * 0.08,
+            0.22 - qs * 0.02, 0.022, 0.12
+          ));
+        }
       }
-      parts.push(sphere(0.16, 6, leaf[0], 0, 0.12, 0, 1.2, 0.4, 1.2));
+      parts.push(sphere(0.18, 7, leaf[0], 0, 0.10, 0, 1.15, 0.38, 1.15));
+      parts.push(sphere(0.10, 5, leaf[4], 0.08, 0.20, 0.05, 1.3, 0.3, 1.0));
     } else if (variant === 'reed') {
       for (var r = 0; r < 5; r += 1) {
         var rx = (hash(r, 223) - 0.5) * 0.7;
@@ -1830,14 +1954,39 @@
         parts.push(part(new THREE.BoxBufferGeometry(0.35, 0.02, 0.05), leaf[2], rx + 0.12, rh * 0.6, rz, 0.2, 0.6, 0.2));
       }
     } else if (variant === 'mushroom') {
-      for (var mu = 0; mu < 3; mu += 1) {
-        var mx = (mu - 1) * 0.25;
-        var mz = mu % 2 === 0 ? 0.08 : -0.1;
-        var mh = 0.25 + mu * 0.06;
-        parts.push(cyl(0.07, 0.09, mh, 5, '#F2DFC0', mx, mh / 2, mz));
-        parts.push(sphere(0.26 - mu * 0.03, 7, mu === 1 ? '#D96A4A' : '#E85D5D', mx, mh + 0.08, mz, 1.1, 0.62, 1.1));
-        parts.push(sphere(0.045, 5, '#F7F5F2', mx + 0.08, mh + 0.16, mz + 0.05));
+      var mushrooms = [
+        [-0.24, 0.08, 0.26, '#D96A4A'],
+        [0.20, -0.06, 0.20, '#E85D5D'],
+        [0.02, 0.24, 0.30, '#C95A46'],
+        [0.38, 0.16, 0.14, '#E8A05A']
+      ];
+      for (var mu = 0; mu < mushrooms.length; mu += 1) {
+        var md = mushrooms[mu];
+        parts.push(part(
+          new THREE.CylinderBufferGeometry(0.045, 0.07, md[2], 6),
+          '#EFE3C8', md[0], md[2] / 2, md[1],
+          (hash(mu, 451) - 0.5) * 0.16, 0, (hash(mu, 453) - 0.5) * 0.16
+        ));
+        parts.push(part(
+          new THREE.SphereBufferGeometry(1, 8, 5),
+          md[3],
+          md[0], md[2] + 0.02, md[1],
+          0, mu, 0,
+          md[2] * 0.92, md[2] * 0.50, md[2] * 0.92
+        ));
+        for (var sp = 0; sp < 4; sp += 1) {
+          var sa = sp / 4 * Math.PI * 2 + mu;
+          parts.push(sphere(
+            md[2] * 0.10, 4, '#F7F2E6',
+            md[0] + Math.cos(sa) * md[2] * 0.48,
+            md[2] + 0.05,
+            md[1] + Math.sin(sa) * md[2] * 0.48,
+            1, 0.55, 1
+          ));
+        }
       }
+      parts.push(sphere(0.42, 7, leaf[0], 0, 0.04, 0, 1.2, 0.16, 1.05));
+      parts.push(sphere(0.30, 6, leaf[2], 0.24, 0.035, 0.12, 1.1, 0.13, 1.0));
     } else if (variant === 'log') {
       parts.push(cyl(0.32, 0.36, 2.3, 8, '#6B4A33', 0, 0.35, 0, Math.PI / 2, 0, 0.1));
       parts.push(cyl(0.27, 0.31, 0.03, 8, '#C6A575', 0, 0.35, 1.16, Math.PI / 2, 0, 0));
@@ -2315,7 +2464,7 @@
     if (!map || !initialized) return;
     var farm = findFarmBuilding();
     var inside = false;
-    if (farm) {
+    if (farm && buildingUnlocked('farm')) {
       var tx = player.x / TILE;
       var tz = player.z / TILE;
       inside = tx >= farm.x && tx <= farm.x + farm.w && tz >= farm.y && tz <= farm.y + farm.h;
@@ -2350,6 +2499,10 @@
     if (!initialized && !init()) return false;
     var farm = findFarmBuilding();
     if (!farm) return false;
+    if (!buildingUnlocked('farm')) {
+      if (window.UI && window.UI.showBuild) window.UI.showBuild('farm');
+      return false;
+    }
     if (!inFarm) {
       var tx = farm.x + farm.w - 3;
       var ty = farm.y + Math.floor(farm.h / 2);
@@ -3176,7 +3329,7 @@
   }
 
   function updateCamera(dt, snap) {
-    var targetY = player.y + 1.5;
+    var targetY = player.y + 2.0;
     if (snap || !camTarget) {
       camTarget = new THREE.Vector3(player.x, targetY, player.z);
     } else {
@@ -3335,7 +3488,7 @@
     nearby = best;
     updateInteractButton();
     if (markerSprite) {
-      if (nearby && !decorateMode && !inFarm) {
+      if (nearby && !decorateMode && !gardenMode && !inFarm) {
         markerSprite.visible = true;
         markerSprite.position.set(nearby.centerX, terrainHeightAt(nearby.centerX, nearby.centerZ) + nearby.labelY + 0.8, nearby.centerZ);
       } else {
@@ -3343,7 +3496,7 @@
       }
     }
     if (markerRing) {
-      if (nearby && !decorateMode && !inFarm) {
+      if (nearby && !decorateMode && !gardenMode && !inFarm) {
         markerRing.visible = true;
         markerRing.position.set(nearby.approachX, terrainHeightAt(nearby.approachX, nearby.approachZ) + 0.06, nearby.approachZ);
       } else {
@@ -3362,8 +3515,11 @@
     if (decorateMode) {
       label = '完成装饰';
       disabled = false;
+    } else if (gardenMode) {
+      label = '完成种植';
+      disabled = false;
     } else if (nearby) {
-      label = '进入' + nearby.name;
+      label = nearby.locked ? ('建设' + nearby.name) : ('进入' + nearby.name);
       disabled = false;
     } else {
       label = '靠近目标互动';
@@ -3382,6 +3538,9 @@
     player.path = [];
     savePlayerPos();
     if (b.type === 'shrine') window.UI.show('prep');
+    else if (!buildingUnlocked(b.type)) {
+      if (window.UI && window.UI.showBuild) window.UI.showBuild(b.type);
+    }
     else if (b.type === 'farm') enterFarm();
     else if (b.type === 'shop') window.UI.show('shop');
     else if (b.type === 'house') window.UI.show('collection');
@@ -3391,6 +3550,10 @@
     if (!initialized) return;
     if (decorateMode) {
       setDecorateMode(false);
+      return;
+    }
+    if (gardenMode) {
+      setGardenMode(false);
       return;
     }
     if (nearby) {
@@ -3472,6 +3635,15 @@
   /* ---------------- 装饰模式 ---------------- */
   function setDecorateMode(on) {
     if (!initialized) return;
+    if (on && !(window.Core && window.Core.isUnlocked('deco'))) {
+      if (window.UI && window.UI.showBuild) window.UI.showBuild('deco');
+      return;
+    }
+    if (on && gardenMode) {
+      gardenMode = false;
+      selectedPlant = null;
+      if (refs.gardenDrawer) refs.gardenDrawer.hidden = true;
+    }
     decorateMode = !!on;
     if (refs.decoDrawer) refs.decoDrawer.hidden = !decorateMode;
     if (decorateMode) {
@@ -3563,6 +3735,480 @@
     } else {
       toast('摆放失败，请换个位置');
     }
+  }
+
+  /* ---------------- 自由种植 ---------------- */
+  function plantMaterial(variant) {
+    if (variant === 'grass') {
+      return new THREE.MeshLambertMaterial({
+        map: getWorldTexture('grass-tuft', drawGrassTuft),
+        transparent: true,
+        alphaTest: 0.22,
+        side: THREE.DoubleSide
+      });
+    }
+    return new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  }
+
+  function drawLeafCluster(g, S) {
+    g.clearRect(0, 0, S, S);
+    var colors = ['#3C6B37', '#4A7B40', '#598D49', '#6A9E54', '#7DB162', '#8FC272'];
+    var cx = S * 0.5;
+    var cy = S * 0.5;
+    for (var i = 0; i < 26; i += 1) {
+      var a = i / 26 * Math.PI * 2 + hash(i, 601) * 0.7;
+      var r = S * (0.10 + hash(i, 603) * 0.32);
+      var lx = cx + Math.cos(a) * r;
+      var ly = cy + Math.sin(a) * r;
+      var len = S * (0.075 + hash(i, 607) * 0.075);
+      var wid = len * (0.42 + hash(i, 609) * 0.18);
+      g.save();
+      g.translate(lx, ly);
+      g.rotate(a + (hash(i, 611) - 0.5) * 0.7);
+      g.fillStyle = colors[i % colors.length];
+      g.globalAlpha = 0.90 + hash(i, 613) * 0.10;
+      g.beginPath();
+      g.ellipse(len * 0.4, 0, len, wid, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = 'rgba(38,66,32,0.55)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.lineTo(len * 1.25, 0);
+      g.stroke();
+      g.strokeStyle = 'rgba(210,232,170,0.30)';
+      g.lineWidth = 0.8;
+      g.beginPath();
+      g.moveTo(len * 0.15, -wid * 0.35);
+      g.lineTo(len * 1.0, -wid * 0.35);
+      g.stroke();
+      g.restore();
+    }
+    g.globalAlpha = 1;
+  }
+
+  function drawBushLeaves(g, S) {
+    g.clearRect(0, 0, S, S);
+    var colors = ['#315D2F', '#3F7139', '#4F8342', '#61964D', '#76AA5B', '#8BBD70'];
+    for (var i = 0; i < 34; i += 1) {
+      var a = i / 34 * Math.PI * 2 + hash(i, 621) * 0.9;
+      var r = S * (0.06 + hash(i, 623) * 0.35);
+      var lx = S * 0.5 + Math.cos(a) * r;
+      var ly = S * 0.5 + Math.sin(a) * r * 0.82;
+      var len = S * (0.055 + hash(i, 627) * 0.055);
+      var wid = len * 0.46;
+      g.save();
+      g.translate(lx, ly);
+      g.rotate(a + (hash(i, 629) - 0.5) * 1.0);
+      g.fillStyle = colors[i % colors.length];
+      g.beginPath();
+      g.ellipse(0, 0, len, wid, 0, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = 'rgba(220,240,180,0.24)';
+      g.lineWidth = 0.8;
+      g.beginPath();
+      g.moveTo(-len * 0.8, 0);
+      g.lineTo(len * 0.8, 0);
+      g.stroke();
+      g.restore();
+    }
+  }
+
+  function drawPineSpray(g, S) {
+    g.clearRect(0, 0, S, S);
+    var baseX = S * 0.12;
+    var baseY = S * 0.5;
+    g.strokeStyle = '#5A432A';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(baseX, baseY);
+    g.quadraticCurveTo(S * 0.52, baseY - 4, S * 0.95, baseY + 2);
+    g.stroke();
+    for (var i = 0; i < 78; i += 1) {
+      var t = hash(i, 641);
+      var x = baseX + t * S * 0.82;
+      var side = i % 2 === 0 ? -1 : 1;
+      var len = S * (0.10 + hash(i, 643) * 0.24) * (0.65 + t * 0.5);
+      var ang = -Math.PI / 2 + side * (0.55 + hash(i, 647) * 0.65);
+      var nx = x + Math.cos(ang) * len;
+      var ny = baseY + Math.sin(ang) * len;
+      g.strokeStyle = i % 5 === 0 ? '#6E8E4A' : (i % 3 === 0 ? '#395C33' : '#4B753F');
+      g.globalAlpha = 0.78 + hash(i, 649) * 0.22;
+      g.lineWidth = 1.1 + hash(i, 653) * 1.2;
+      g.beginPath();
+      g.moveTo(x, baseY + (side < 0 ? 1 : -1) * 1.2);
+      g.lineTo(nx, ny);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+
+  function drawPalmLeaf(g, S) {
+    g.clearRect(0, 0, S, S);
+    var midY = S * 0.5;
+    g.strokeStyle = '#7A6236';
+    g.lineWidth = 3.2;
+    g.beginPath();
+    g.moveTo(S * 0.06, midY + 2);
+    g.quadraticCurveTo(S * 0.55, midY - 3, S * 0.97, midY + 1);
+    g.stroke();
+    for (var i = 0; i < 64; i += 1) {
+      var t = 0.10 + hash(i, 661) * 0.82;
+      var x = S * 0.06 + t * S * 0.90;
+      var side = i % 2 === 0 ? -1 : 1;
+      var len = S * (0.035 + hash(i, 663) * 0.095) * (1.1 - Math.abs(t - 0.55) * 0.9);
+      var ang = -Math.PI / 2 + side * (0.75 + hash(i, 667) * 0.45);
+      var nx = x + Math.cos(ang) * len;
+      var ny = midY + Math.sin(ang) * len;
+      g.strokeStyle = i % 4 === 0 ? '#6D9C50' : (i % 3 === 0 ? '#477D3D' : '#588C46');
+      g.lineWidth = 1.5 + hash(i, 669) * 1.3;
+      g.beginPath();
+      g.moveTo(x, midY);
+      g.lineTo(nx, ny);
+      g.stroke();
+    }
+  }
+
+  var PLANT_FOLIAGE = {
+    treeA: { tex: 'leaf-cards', draw: drawLeafCluster, count: 34, long: 0.78, tall: 0.64 },
+    treeB: { tex: 'pine-cards', draw: drawPineSpray, count: 34, long: 0.82, tall: 0.46 },
+    treeC: { tex: 'palm-cards', draw: drawPalmLeaf, count: 16, long: 1.45, tall: 0.46 },
+    bush: { tex: 'bush-cards', draw: drawBushLeaves, count: 20, long: 0.52, tall: 0.42 }
+  };
+  var foliageGeometries = {};
+
+  function buildFoliageGeometry(variant) {
+    if (foliageGeometries[variant]) return foliageGeometries[variant];
+    var cfg = PLANT_FOLIAGE[variant];
+    if (!cfg) return null;
+    var positions = [];
+    var uvs = [];
+    var indices = [];
+    var offset = 0;
+    var normalAxis = new THREE.Vector3(0, 0, 1);
+    for (var i = 0; i < cfg.count; i += 1) {
+      var w = cfg.long * (0.80 + hash(i, 701) * 0.40);
+      var h = cfg.tall * (0.80 + hash(i, 703) * 0.40);
+      var g = new THREE.PlaneBufferGeometry(w, h);
+      var pos = new THREE.Vector3();
+      var normal = new THREE.Vector3();
+      if (variant === 'treeA') {
+        var ta = hash(i, 709) * Math.PI * 2;
+        var tv = 0.12 + hash(i, 711) * 0.82;
+        var phi = Math.acos(1 - 2 * tv);
+        var dir = new THREE.Vector3(
+          Math.cos(ta) * Math.sin(phi),
+          Math.cos(phi) * 1.10,
+          Math.sin(ta) * Math.sin(phi)
+        );
+        pos.set(0.02 + dir.x * 1.24, 4.05 + dir.y * 1.02, dir.z * 1.22);
+        normal.set(dir.x, dir.y * 0.9 + 0.18, dir.z).normalize();
+      } else if (variant === 'bush') {
+        var ba = hash(i, 709) * Math.PI * 2;
+        var bv = hash(i, 711);
+        var bphi = Math.acos(1 - 2 * bv);
+        var bdir = new THREE.Vector3(
+          Math.cos(ba) * Math.sin(bphi),
+          Math.cos(bphi) * 1.15,
+          Math.sin(ba) * Math.sin(bphi)
+        );
+        pos.set(bdir.x * 0.68, 0.62 + bdir.y * 0.48, bdir.z * 0.62);
+        normal.set(bdir.x, bdir.y * 0.8 + 0.25, bdir.z).normalize();
+      } else if (variant === 'treeB') {
+        var by = 1.95 + hash(i, 709) * 3.55;
+        var br = Math.max(0.22, (1.95 - (by - 1.55) * 0.31) * 0.82);
+        var baa = hash(i, 711) * Math.PI * 2;
+        pos.set(Math.cos(baa) * br, by, Math.sin(baa) * br);
+        normal.set(Math.cos(baa) * 0.82, 0.52, Math.sin(baa) * 0.82).normalize();
+      } else {
+        var pa = hash(i, 709) * Math.PI * 2;
+        var pr = 0.45 + hash(i, 711) * 1.25;
+        pos.set(Math.cos(pa) * pr + 0.18, 4.28 + hash(i, 713) * 0.55, Math.sin(pa) * pr);
+        normal.set(Math.cos(pa) * 0.42, 1, Math.sin(pa) * 0.42).normalize();
+      }
+      var quat = new THREE.Quaternion().setFromUnitVectors(normalAxis, normal);
+      var roll = new THREE.Quaternion().setFromAxisAngle(normalAxis, (hash(i, 715) - 0.5) * 2.6);
+      quat.multiply(roll);
+      var m = new THREE.Matrix4().compose(pos, quat, new THREE.Vector3(1, 1, 1));
+      g.applyMatrix4(m);
+      var pArr = g.attributes.position.array;
+      var uv = g.attributes.uv.array;
+      var idx = g.index.array;
+      for (var k = 0; k < pArr.length; k += 1) positions.push(pArr[k]);
+      for (var u = 0; u < uv.length; u += 1) uvs.push(uv[u]);
+      for (var n = 0; n < idx.length; n += 1) indices.push(idx[n] + offset);
+      offset += pArr.length / 3;
+      g.dispose();
+    }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    foliageGeometries[variant] = geo;
+    return geo;
+  }
+
+  var grassBaseGeometry = null;
+
+  function buildGrassBaseGeometry() {
+    if (grassBaseGeometry) return grassBaseGeometry;
+    var parts = [];
+    var gcol = ['#315B31', '#3C6938', '#477640', '#528246'];
+    for (var i = 0; i < 7; i += 1) {
+      var a = i / 7 * Math.PI * 2;
+      var r = i === 0 ? 0 : 0.30 + (i % 3) * 0.10;
+      parts.push(part(
+        new THREE.IcosahedronBufferGeometry(0.38 + (i % 2) * 0.08, 0),
+        gcol[i % gcol.length],
+        Math.cos(a) * r, 0.10 + (i % 3) * 0.025, Math.sin(a) * r,
+        0, a, 0, 1.25, 0.28, 1.10
+      ));
+    }
+    grassBaseGeometry = mergeParts(parts);
+    return grassBaseGeometry;
+  }
+
+  function addGrassBases(matrices, count) {
+    if (!count) return;
+    var geo = buildGrassBaseGeometry();
+    var mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    var inst = new THREE.InstancedMesh(geo, mat, count);
+    for (var i = 0; i < count; i += 1) inst.setMatrixAt(i, matrices[i]);
+    inst.instanceMatrix.needsUpdate = true;
+    inst.frustumCulled = false;
+    scene.add(inst);
+    plantMeshes.push(inst);
+  }
+
+  function addPlantCards(variant, matrices, count) {
+    var cfg = PLANT_FOLIAGE[variant];
+    if (!cfg || !count) return;
+    var geo = buildFoliageGeometry(variant);
+    if (!geo) return;
+    var mat = new THREE.MeshLambertMaterial({
+      map: getWorldTexture(cfg.tex, cfg.draw),
+      transparent: true,
+      alphaTest: 0.34,
+      side: THREE.DoubleSide,
+      depthWrite: true
+    });
+    var inst = new THREE.InstancedMesh(geo, mat, count);
+    for (var i = 0; i < count; i += 1) inst.setMatrixAt(i, matrices[i]);
+    inst.instanceMatrix.needsUpdate = true;
+    inst.frustumCulled = false;
+    scene.add(inst);
+    plantMeshes.push(inst);
+  }
+
+  function restorePlantSolid() {
+    for (var key in plantSolidTiles) {
+      if (!Object.prototype.hasOwnProperty.call(plantSolidTiles, key)) continue;
+      var parts = key.split(',');
+      var x = parseInt(parts[0], 10);
+      var y = parseInt(parts[1], 10);
+      if (inBounds(x, y)) map.solid[y][x] = plantSolidTiles[key];
+    }
+    plantSolidTiles = {};
+  }
+
+  function refreshPlants() {
+    if (!map || !scene) return;
+    for (var i = 0; i < plantMeshes.length; i += 1) {
+      var old = plantMeshes[i];
+      scene.remove(old);
+      if (old.material) old.material.dispose();
+    }
+    plantMeshes = [];
+    restorePlantSolid();
+    var s = window.Core.getState();
+    if (!s || !s.plants || !s.plants.length) return;
+    var byVariant = {};
+    var shadows = [];
+    for (i = 0; i < s.plants.length; i += 1) {
+      var placed = s.plants[i];
+      var def = window.Core.findPlant(placed.id);
+      if (!def) continue;
+      var variant = def.variant;
+      var x = (placed.x + 0.5) * TILE;
+      var z = (placed.y + 0.5) * TILE;
+      var y = terrainHeightAt(x, z);
+      var rot = hash(placed.x + 13, placed.y + 17) * Math.PI * 2;
+      var scale = 0.90 + hash(placed.x + 19, placed.y + 23) * 0.26;
+      if (variant === 'grass') scale = 1.14 + hash(placed.x + 19, placed.y + 23) * 0.36;
+      else if (variant === 'flower' || variant === 'fern' || variant === 'mushroom' || variant === 'reed' || variant === 'pebble') {
+        scale = 0.94 + hash(placed.x + 19, placed.y + 23) * 0.30;
+      }
+      if (!byVariant[variant]) byVariant[variant] = [];
+      byVariant[variant].push({ x: x, y: y, z: z, rot: rot, scale: scale, def: def });
+      var shadowSize = SHADOW_SIZE[variant];
+      if (shadowSize) shadows.push({ x: x, y: y, z: z, size: shadowSize * scale });
+      if (def.solid) {
+        var key = placed.x + ',' + placed.y;
+        if (!Object.prototype.hasOwnProperty.call(plantSolidTiles, key)) {
+          plantSolidTiles[key] = map.solid[placed.y][placed.x];
+        }
+        map.solid[placed.y][placed.x] = true;
+      }
+    }
+    for (var name in byVariant) {
+      if (!Object.prototype.hasOwnProperty.call(byVariant, name)) continue;
+      var list = byVariant[name];
+      var geo = buildSceneryGeometry(name);
+      var mat = plantMaterial(name);
+      var inst = new THREE.InstancedMesh(geo, mat, list.length);
+      var matrix = new THREE.Matrix4();
+      var quat = new THREE.Quaternion();
+      var scaleVec = new THREE.Vector3();
+      var matrices = [];
+      for (var k = 0; k < list.length; k += 1) {
+        quat.setFromEuler(new THREE.Euler(0, list[k].rot, 0));
+        scaleVec.set(list[k].scale, list[k].scale, list[k].scale);
+        matrix.compose(new THREE.Vector3(list[k].x, list[k].y, list[k].z), quat, scaleVec);
+        matrices.push(matrix.clone());
+        inst.setMatrixAt(k, matrix);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      inst.frustumCulled = false;
+      scene.add(inst);
+      plantMeshes.push(inst);
+      addPlantCards(name, matrices, list.length);
+      if (name === 'grass') addGrassBases(matrices, list.length);
+    }
+    if (shadows.length) {
+      var shadowGeo = new THREE.PlaneBufferGeometry(1, 1);
+      shadowGeo.rotateX(-Math.PI / 2);
+      var shadowMat = new THREE.MeshBasicMaterial({
+        map: getWorldTexture('scenery-shadow', drawShadowTexture),
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -1
+      });
+      var shadowInst = new THREE.InstancedMesh(shadowGeo, shadowMat, shadows.length);
+      var sm = new THREE.Matrix4();
+      var sq = new THREE.Quaternion();
+      var sv = new THREE.Vector3();
+      for (var sh = 0; sh < shadows.length; sh += 1) {
+        sv.set(shadows[sh].size, 1, shadows[sh].size * 0.7);
+        sm.compose(new THREE.Vector3(shadows[sh].x + 0.2, shadows[sh].y + 0.035, shadows[sh].z + 0.16), sq, sv);
+        shadowInst.setMatrixAt(sh, sm);
+      }
+      shadowInst.instanceMatrix.needsUpdate = true;
+      scene.add(shadowInst);
+      plantMeshes.push(shadowInst);
+    }
+  }
+
+  function setGardenMode(on) {
+    if (!initialized) return;
+    if (on && !(window.Core && window.Core.isUnlocked('garden'))) {
+      if (window.UI && window.UI.showBuild) window.UI.showBuild('garden');
+      return;
+    }
+    if (on && decorateMode) {
+      decorateMode = false;
+      if (refs.decoDrawer) refs.decoDrawer.hidden = true;
+      selectedDeco = null;
+    }
+    gardenMode = !!on;
+    if (refs.gardenDrawer) refs.gardenDrawer.hidden = !gardenMode;
+    if (gardenMode) {
+      renderGardenList();
+      showHint('选择植物，点击附近草地种植；点击已有植物可以拔除', 5600);
+    } else {
+      selectedPlant = null;
+      showHint('种植完成', 1800);
+    }
+    updateInteractButton();
+  }
+
+  function toggleGarden() {
+    if (!initialized) return;
+    setGardenMode(!gardenMode);
+  }
+
+  function selectPlant(id) {
+    if (!initialized) return;
+    var def = window.Core.findPlant(id);
+    if (!def) return;
+    selectedPlant = selectedPlant === id ? null : id;
+    renderGardenList();
+    if (selectedPlant) showHint('已选择' + def.name + '，点击附近地面种植', 2400);
+  }
+
+  function renderGardenList() {
+    if (!refs.gardenList) return;
+    var s = window.Core.getState();
+    if (refs.gardenDrawer) {
+      var hintEl = refs.gardenDrawer.querySelector('.garden-drawer-head span');
+      if (hintEl) hintEl.textContent = '已种 ' + s.plants.length + '/' + D.CONFIG.maxPlants + ' · 草簇免费 · 点植物可拔除';
+    }
+    var html = '';
+    for (var i = 0; i < D.PLANTS.length; i += 1) {
+      var def = D.PLANTS[i];
+      var afford = def.cost === 0 || s.coins >= def.cost;
+      html += '<button type="button" class="garden-item' + (selectedPlant === def.id ? ' is-selected' : '') +
+        (afford ? '' : ' is-locked') + '" data-action="world-select-plant" data-plant="' + def.id + '">' +
+        '<span class="garden-item-ico">' + window.Art.icon(def.icon, def.solid ? '#8FB8E8' : '#9FD49B') + '</span>' +
+        '<span class="garden-item-name">' + def.name + '</span>' +
+        '<span class="garden-item-cost">' + (def.cost ? def.cost + ' 金币' : '免费') + '</span>' +
+        '</button>';
+    }
+    refs.gardenList.innerHTML = html;
+  }
+
+  function gardenTileOk(tx, ty) {
+    if (!inBounds(tx, ty)) return false;
+    var tile = map.tiles[ty][tx];
+    if (tile !== 3 && tile !== 2) return false;
+    if (map.solid[ty][tx] || map.decoBlocked[ty][tx]) return false;
+    if (window.Core.getDecoAt(tx, ty)) return false;
+    if (window.Core.getPlantAt && window.Core.getPlantAt(tx, ty)) return false;
+    if (Math.floor(player.x / TILE) === tx && Math.floor(player.z / TILE) === ty) return false;
+    return true;
+  }
+
+  function handleGardenTap(tx, ty) {
+    if (!inBounds(tx, ty)) return;
+    if (window.Core.getPlantAt && window.Core.getPlantAt(tx, ty)) {
+      var removed = window.Core.removePlantAt(tx, ty);
+      if (removed) {
+        toast('已拔除' + removed.name);
+        window.Core.saveState();
+        refreshPlants();
+        if (window.UI && window.UI.renderHUD) window.UI.renderHUD();
+        renderGardenList();
+      }
+      return;
+    }
+    if (!selectedPlant) { toast('先在下方选择一种植物'); return; }
+    var def = window.Core.findPlant(selectedPlant);
+    if (!def) return;
+    if (!gardenTileOk(tx, ty)) {
+      if (map.tiles[ty][tx] === 4) toast('小路和广场上不能种植');
+      else if (map.tiles[ty][tx] === 5) toast('水里不能种植，可以种在岸边');
+      else toast('这里被占用了，换一块草地吧');
+      return;
+    }
+    if (dist2(tx + 0.5, ty + 0.5, player.x / TILE, player.z / TILE) > 10) {
+      toast('离得太远了，走近一点再种');
+      return;
+    }
+    var result = window.Core.buyPlant(selectedPlant, tx, ty);
+    if (!result.ok) {
+      toast(result.reason || '种不下去');
+      return;
+    }
+    toast(result.def.cost ? ('种下了' + result.def.name) : '铺上了一片' + result.def.name);
+    window.Core.saveState();
+    refreshPlants();
+    if (window.UI && window.UI.renderHUD) window.UI.renderHUD();
+    renderGardenList();
+    var st = window.Core.getState();
+    if (st.coins < def.cost && def.cost > 0) selectedPlant = 'grass';
+    renderGardenList();
   }
 
   /* ---------------- 玩家更新 ---------------- */
@@ -3700,10 +4346,12 @@
     var tx = Math.floor(player.x / TILE);
     var ty = Math.floor(player.z / TILE);
     var name = '中央草原';
+    var st = window.Core.getState();
+    var unlocks = (st && st.unlocks) || {};
     if (ty < 12) name = '北岸 · 战斗祭坛';
-    else if (tx < 14 && ty >= 24 && ty <= 36) name = '西侧 · 小农田';
-    else if (tx > 27 && ty >= 24 && ty <= 36) name = '东侧 · 杂货铺';
-    else if (ty > 37) name = '南岸 · 我的小屋';
+    else if (tx < 14 && ty >= 24 && ty <= 36) name = unlocks.farm ? '西侧 · 小农田' : '西侧 · 预留农田';
+    else if (tx > 27 && ty >= 24 && ty <= 36) name = unlocks.shop ? '东侧 · 杂货铺' : '东侧 · 预留商铺';
+    else if (ty > 37) name = unlocks.house ? '南岸 · 我的小屋' : '南岸 · 预留空地';
     else if (dist2(tx, ty, 9, 15) < 6) name = '林间水塘';
     var text = '青青小岛 · ' + name;
     if (text !== placeText) {
@@ -3722,6 +4370,12 @@
     for (var i = 0; i < s.worldDecos.length; i += 1) {
       var d = s.worldDecos[i];
       mctx.fillRect(d.x / COLS * minimapCanvas.width, d.y / ROWS * minimapCanvas.height, 1.6, 1.6);
+    }
+    for (i = 0; i < s.plants.length; i += 1) {
+      var pl = s.plants[i];
+      var pdef = window.Core.findPlant(pl.id);
+      mctx.fillStyle = pdef && pdef.solid ? '#356B3E' : '#79B86A';
+      mctx.fillRect(pl.x / COLS * minimapCanvas.width, pl.y / ROWS * minimapCanvas.height, 1.4, 1.4);
     }
     var px = player.x / WORLD_W * minimapCanvas.width;
     var py = player.z / WORLD_H * minimapCanvas.height;
@@ -3820,6 +4474,7 @@
     if (avatarGroup) avatarGroup.position.set(player.x, player.y, player.z);
     buildAvatar(s.formId);
     refreshDecos();
+    refreshPlants();
     refreshFarmCrops();
     updateNearby();
     updatePlaceName();
@@ -3922,6 +4577,10 @@
       handleDecoTap(tx, ty);
       return;
     }
+    if (gardenMode) {
+      handleGardenTap(tx, ty);
+      return;
+    }
     var hit = hitBuilding(point.x, point.z);
     if (hit) {
       walkToBuilding(hit);
@@ -4003,6 +4662,8 @@
     refs.interactLabel = document.getElementById('interact-label');
     refs.decoDrawer = document.getElementById('deco-drawer');
     refs.decoList = document.getElementById('deco-list');
+    refs.gardenDrawer = document.getElementById('garden-drawer');
+    refs.gardenList = document.getElementById('garden-list');
     refs.loading = document.getElementById('world-loading');
     if (!refs.stage || !canvas || !minimapCanvas) return false;
     mctx = minimapCanvas.getContext('2d');
@@ -4032,6 +4693,7 @@
       buildDecoGeometries();
       buildDecoMeshes();
       buildScenery();
+      refreshPlants();
       buildButterflies();
       createAvatar();
       createMarker();
@@ -4090,8 +4752,11 @@
     joystick.pointerId = null;
     if (refs.joystickKnob) refs.joystickKnob.style.transform = 'translate(0,0)';
     decorateMode = false;
-    selectedDeco = null;
+    gardenMode = false;
+    selectedPlant = null;
     if (refs.decoDrawer) refs.decoDrawer.hidden = true;
+    if (refs.gardenDrawer) refs.gardenDrawer.hidden = true;
+    selectedDeco = null;
     inFarm = false;
     farmTargetIndex = -1;
     document.body.classList.remove('is-in-farm');
@@ -4283,6 +4948,12 @@
     },
     isActive: function () { return active; },
     isDecorating: function () { return decorateMode; },
+    isGardening: function () { return gardenMode; },
+    refreshBuildings: refreshBuildings,
+    refreshPlants: refreshPlants,
+    toggleGarden: toggleGarden,
+    selectPlant: selectPlant,
+    renderGardenList: renderGardenList,
     getPlayer: function () {
       return { x: player.x, z: player.z, tileX: Math.floor(player.x / TILE), tileY: Math.floor(player.z / TILE) };
     },

@@ -122,12 +122,35 @@
     { id: 'item', name: '随机装备', cost: 160, type: 'randomItem', desc: '获得一件随机装备。' }
   ];
 
+  var UNLOCKS = [
+    { id: 'garden', name: '花园与自由种植', cost: 30, icon: 'tree', desc: '解锁后可以在草地上自由种草、花、树、灌木和岩石。' },
+    { id: 'shop', name: '杂货铺', cost: 40, icon: 'bag', desc: '用金币购买种子、清水、肥料、道具卡和随机装备。' },
+    { id: 'farm', name: '小农田', cost: 80, icon: 'sprout', desc: '4 块田：种田、浇水、施肥、铲除，成熟后收获。' },
+    { id: 'deco', name: '装饰工坊', cost: 70, icon: 'tree', desc: '摆放 12 种装饰，提高小岛繁荣度和战力。' },
+    { id: 'house', name: '小屋与图鉴', cost: 120, icon: 'book', desc: '解锁图鉴、变身次数和最近变身记录。' },
+    { id: 'tower', name: '战斗高塔', cost: 150, icon: 'tower', desc: '12 层难度递增的连续挑战。' }
+  ];
+
+  var PLANTS = [
+    { id: 'grass', name: '草簇', cost: 0, solid: false, variant: 'grass', icon: 'sprout', desc: '免费，用来铺满小岛。' },
+    { id: 'flower', name: '野花', cost: 2, solid: false, variant: 'flower', icon: 'star', desc: '成片种在路边更好看。' },
+    { id: 'fern', name: '蕨草', cost: 4, solid: false, variant: 'fern', icon: 'sprout', desc: '适合树下和阴凉处。' },
+    { id: 'mushroom', name: '蘑菇', cost: 3, solid: false, variant: 'mushroom', icon: 'star', desc: '树根边的小惊喜。' },
+    { id: 'reed', name: '芦苇', cost: 3, solid: false, variant: 'reed', icon: 'sprout', desc: '种在水边最自然。' },
+    { id: 'pebble', name: '卵石', cost: 1, solid: false, variant: 'pebble', icon: 'gem', desc: '给路边增加一点细节。' },
+    { id: 'bush', name: '灌木', cost: 12, solid: true, variant: 'bush', icon: 'tree', desc: '会挡路的小灌木。' },
+    { id: 'tree', name: '阔叶树', cost: 30, solid: true, variant: 'treeA', icon: 'tree', desc: '有树荫的大树，会挡路。' },
+    { id: 'pine', name: '松树', cost: 35, solid: true, variant: 'treeB', icon: 'tree', desc: '北岸风格的层叠松树。' },
+    { id: 'palm', name: '棕榈', cost: 25, solid: true, variant: 'treeC', icon: 'tree', desc: '适合种在路旁和沙滩边。' },
+    { id: 'rock', name: '岩石', cost: 18, solid: true, variant: 'rock', icon: 'gem', desc: '带苔藓的石头，会挡路。' }
+  ];
+
   var WORLD = {
     tile: 32,
     cols: 40,
     rows: 48,
     seed: 20261119,
-    spawn: { x: 20.5, y: 30.5 },
+    spawn: { x: 20.5, y: 20.5 },
     maxDecos: 80,
     buildings: [
       { id: 'shrine', type: 'shrine', name: '战斗祭坛', x: 18, y: 5, w: 5, h: 4, approach: { x: 20, y: 10 }, hint: '抽取对手，传送到擂台' },
@@ -174,6 +197,7 @@
     plotCount: 4,
     decoSlotCount: 12,
     maxWorldDecos: 80,
+    maxPlants: 320,
     tierNames: ['', '普通', '稀有', '史诗', '传说', '神话'],
     typeNames: { weapon: '武器', armor: '护甲', accessory: '饰品' },
     rarityColors: ['', '#9AA7B8', '#4FA8E8', '#BB6BD9', '#F2994A', '#F26B3F'],
@@ -191,6 +215,8 @@
     CROPS: CROPS,
     SHOP: SHOP,
     WHEEL: WHEEL,
+    UNLOCKS: UNLOCKS,
+    PLANTS: PLANTS,
     TOWER: TOWER,
     WORLD: WORLD,
     CONFIG: CONFIG

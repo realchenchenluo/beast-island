@@ -437,7 +437,7 @@ body.is-in-farm .world-right { display: none; }
 /* ---------- 世界操作 Dock：图标 + 文字 ---------- */
 .world-quick {
   display: grid;
-  grid-template-columns: repeat(6, 42px);
+  grid-template-columns: repeat(var(--quick-cols, 4), 42px);
   grid-gap: 5px;
   padding: 6px;
   margin-bottom: 8px;
@@ -471,6 +471,9 @@ body.is-in-farm .world-right { display: none; }
 }
 .world-quick .quick-btn.tower { background: #241E2E; border-color: #4A3A5E; color: #D6C2F0; }
 .world-quick .quick-btn.farm { background: #17241C; border-color: #35553F; color: #BFE6CB; }
+.world-quick .quick-btn.build { background: #2A2216; border-color: #5B4A2C; color: #F0D7A4; }
+.quick-btn[hidden] { display: none !important; }
+.world-quick .quick-btn.garden { background: #17241C; border-color: #3C5A42; color: #BFE6CB; }
 .quick-ico {
   width: 20px;
   height: 20px;
@@ -484,7 +487,7 @@ body.is-in-farm .world-right { display: none; }
 .btn .icon-svg { width: 16px; height: 16px; flex: none; margin-right: 6px; }
 .btn.tiny .icon-svg { width: 13px; height: 13px; margin-right: 4px; }
 @media (max-width: 390px) {
-  .world-quick { grid-template-columns: repeat(6, 38px); grid-gap: 4px; padding: 5px; }
+  .world-quick { grid-template-columns: repeat(var(--quick-cols, 4), 38px); grid-gap: 4px; padding: 5px; }
   .world-quick .quick-btn { width: 38px; height: 46px; }
   .quick-ico, .quick-ico .icon-svg { width: 18px; height: 18px; }
   .quick-label { font-size: 8px; letter-spacing: 0; }
@@ -644,3 +647,134 @@ body.is-in-farm .world-right { display: none; }
 .guide-actions { display: flex; margin-top: 12px; }
 .guide-actions .btn { flex: 1; }
 .guide-actions .btn + .btn { margin-left: 8px; }
+
+
+/* ---------- 建设页 ---------- */
+.build-body { padding-bottom: 28px; }
+.build-intro {
+  margin: 4px 0 12px;
+  padding: 14px 15px;
+  background: linear-gradient(140deg, #241E16, #171D24 70%);
+  border: 1px solid #4A3A23;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.build-intro b {
+  display: block;
+  font-family: var(--serif);
+  font-size: 17px;
+  letter-spacing: 1.5px;
+  color: #F0E1C0;
+  margin-bottom: 6px;
+}
+.build-intro span { display: block; font-size: 11px; line-height: 1.7; color: #AFA595; }
+.build-list { display: flex; flex-direction: column; gap: 9px; }
+.build-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  background: linear-gradient(140deg, #19212A, #141A21);
+  border: 1px solid #2A3540;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+.build-card.is-owned { border-color: #33503F; background: linear-gradient(140deg, #18241D, #141B20); }
+.build-card.is-focus { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(214, 177, 111, 0.35), 0 8px 20px rgba(0, 0, 0, 0.3); }
+.build-art {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #10151B;
+  border: 1px solid #2A3540;
+}
+.build-art .icon-svg { width: 24px; height: 24px; }
+.build-main { flex: 1 1 auto; min-width: 0; }
+.build-main strong { display: block; font-size: 13px; color: #EEE4D2; letter-spacing: 0.4px; }
+.build-main p { margin: 3px 0 5px; font-size: 10px; line-height: 1.5; color: #9B9386; }
+.build-cost { display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; color: var(--gold); }
+.build-card.is-owned .build-cost { color: #8FC7A2; }
+.coin-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #F2C94C;
+  box-shadow: inset 0 0 0 1.5px #C98A3A;
+}
+.build-buy { flex: none; min-width: 58px; }
+.build-state { flex: none; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; }
+.build-state .icon-svg { width: 20px; height: 20px; }
+.build-note { margin-top: 12px; }
+.build-note p { margin: 6px 0 0; font-size: 10px; line-height: 1.75; color: #A79E90; }
+
+/* ---------- 自由种植抽屉 ---------- */
+.garden-drawer {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 140px;
+  bottom: calc(140px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  max-height: 34%;
+  background: #121820;
+  border: 1px solid #2C3B33;
+  border-radius: 16px;
+  padding: 8px 10px 6px;
+  z-index: 14;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.garden-drawer-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #27313C;
+  padding-bottom: 6px;
+}
+.garden-drawer-head strong { font-size: 12px; flex: none; color: #DDEBDD; }
+.garden-drawer-head span {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 9px;
+  color: #8FA294;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.garden-list {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.garden-item {
+  position: relative;
+  flex: none;
+  width: 64px;
+  margin-right: 7px;
+  background: #1A222B;
+  border: 1px solid #2A3540;
+  border-radius: 12px;
+  padding: 6px 4px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #E9E1D2;
+}
+.garden-item.is-selected { border-color: #8CC77E; background: #18261D; }
+.garden-item.is-locked { opacity: 0.45; }
+.garden-item-ico { width: 24px; height: 24px; margin-bottom: 2px; }
+.garden-item-ico .icon-svg { width: 24px; height: 24px; }
+.garden-item-name { font-size: 9px; font-weight: 700; white-space: nowrap; }
+.garden-item-cost { font-size: 8px; color: #9BB7A0; margin-top: 1px; }
+@media (max-width: 390px) {
+  .garden-drawer { bottom: 126px; bottom: calc(126px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
+  .build-card { padding: 9px 10px; gap: 9px; }
+  .build-art { width: 40px; height: 40px; }
+  .build-main p { font-size: 9.5px; }
+}

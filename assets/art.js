@@ -772,6 +772,7 @@
       bag: '<path d="M6 8h12l1 13H5L6 8z" fill="' + c + '"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="' + c + '" stroke-width="2"/><path d="M9 12h6" stroke="#171009" stroke-width="1.2" opacity=".3"/>',
       book: '<path d="M4 5c3-1 6-1 8 1 2-2 5-2 8-1v14c-3-1-6-1-8 1-2-2-5-2-8-1V5z" fill="' + c + '"/><path d="M12 6v14" stroke="#171009" stroke-width="1.2" opacity=".3"/>',
       tree: '<path d="M12 2 L16.5 8.5 H13.8 L18 14.5 H6 L10.2 8.5 H7.5 Z" fill="' + c + '"/><rect x="11" y="14" width="2" height="6" fill="' + c + '"/>',
+      build: '<path d="M14.7 4.2 L19.8 9.3 L17.9 11.2 L12.8 6.1 Z" fill="' + c + '"/><path d="M12.2 6.7 L4.5 14.4 L9.6 19.5 L17.3 11.8 Z" fill="' + c + '"/><path d="M3.5 16.5 L7.5 20.5" stroke="' + c + '" stroke-width="2.6" stroke-linecap="round"/>',
       fast: '<path d="M4 5 L11 12 L4 19 Z M11 5 L18 12 L11 19 Z" fill="' + c + '"/>',
       gem: '<path d="M12 3 L20 9 L16 21 L8 21 L4 9 Z" fill="' + c + '"/>',
       check: '<path d="M4 12 L10 18 L20 6" fill="none" stroke="' + c + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',

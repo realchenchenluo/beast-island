@@ -22,11 +22,13 @@
   var farmMatureFlags = [];
   var guideStep = 0;
   var guideShown = false;
+  var buildFocus = null;
   var guideSteps = [
-    { art: 'rabbit', title: '欢迎来到变身岛', body: '你会随机变身为 34 种生物。每次战斗、种田和装饰都会让这座小岛更像你的家。' },
-    { art: 'fox', title: '先学会走路', body: '左下角摇杆或 WASD / 方向键移动，拖动画面旋转视角，点击地面会自动寻路。右下角的图标可以打开战斗、高塔、农田、背包、图鉴和装饰。' },
-    { art: 'tiger', title: '普通攻击与技能', body: '战斗会自动进行。普通攻击出现得更多，并积累气势；气势满后才会随机释放技能。胜利后转动战利品转盘，失败了也可以选择随机变身或保持形态。' },
-    { art: 'cow', title: '农田与整座岛', body: '走进农田，靠近田块会出现操作面板：种田、浇水、施肥、铲除；成熟后变成收获。肥料可以在杂货铺买到。' }
+    { art: 'rabbit', title: '一座空岛，从你开始', body: '岛上现在只有战斗祭坛和草地。没有现成的花园、商店和农田，都要靠金币一点点建设起来。' },
+    { art: 'fox', title: '先学会走路', body: '左下角摇杆或 WASD / 方向键移动，拖动画面旋转视角，点击地面会自动寻路。靠近祭坛后点右下角的互动按钮。' },
+    { art: 'tiger', title: '去祭坛赚第一笔金币', body: '战斗会自动进行：普通攻击更常出现并积累气势，气势满后才会随机释放技能。胜利后转动战利品转盘，金币和物资都从这里来。' },
+    { art: 'hedgehog', title: '用金币建设小岛', body: '点右侧的「建设」打开建设页，可以解锁花园、杂货铺、小农田、装饰、小屋和高塔。解锁后建筑会真的出现在岛上，快捷栏也会多出对应入口。' },
+    { art: 'cow', title: '自由种出一座岛', body: '解锁花园后，点「种植」自选草、花、蕨、蘑菇、芦苇、卵石、灌木、树和岩石，点附近地面就能种。草簇免费，点已有植物可以拔除重来。' }
   ];
   var farmDockTimer = null;
   var farmTargetIndex = -1;
@@ -89,7 +91,7 @@
     return m + '/' + day + ' ' + (hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm);
   }
 
-  function toast(message) {
+  function toast(message, duration) {
     var el = document.getElementById('toast');
     if (!el) return;
     el.textContent = message;
@@ -98,7 +100,7 @@
     toastTimer = setTimeout(function () {
       el.classList.remove('is-visible');
       toastTimer = null;
-    }, 2000);
+    }, duration || 2000);
   }
 
   function renderHUD() {
@@ -1461,6 +1463,81 @@
     toast(message);
   }
 
+  /* ---------------- 建设与快捷栏 ---------------- */
+  var UNLOCK_ICONS = {
+    garden: 'sprout', shop: 'bag', farm: 'seed',
+    deco: 'tree', house: 'book', tower: 'tower'
+  };
+
+  function visibleQuickCount() {
+    var s = state();
+    if (!s) return 2;
+    var count = 0;
+    var btns = document.querySelectorAll('#world-quick .quick-btn');
+    for (var i = 0; i < btns.length; i += 1) {
+      var need = btns[i].getAttribute('data-unlock');
+      if (!need || (s.unlocks && s.unlocks[need])) count += 1;
+    }
+    return Math.max(1, Math.min(4, count));
+  }
+
+  function renderQuickDock() {
+    var s = state();
+    if (!s) return;
+    var btns = document.querySelectorAll('#world-quick .quick-btn');
+    var shown = 0;
+    for (var i = 0; i < btns.length; i += 1) {
+      var need = btns[i].getAttribute('data-unlock');
+      var open = !need || !!(s.unlocks && s.unlocks[need]);
+      btns[i].hidden = !open;
+      btns[i].setAttribute('aria-hidden', open ? 'false' : 'true');
+      if (open) shown += 1;
+    }
+    var dock = document.getElementById('world-quick');
+    if (dock) dock.style.setProperty('--quick-cols', String(Math.min(4, Math.max(1, shown))));
+  }
+
+  function renderBuild() {
+    var s = state();
+    var shell = document.getElementById('build-shell');
+    if (!shell) return;
+    var html = [];
+    html.push(head('建设小岛', '金币 ' + s.coins + ' · 解锁后永久开放', 'go-world'));
+    html.push('<div class="screen-body build-body">');
+    html.push('<div class="build-intro"><b>从一座空岛开始</b><span>祭坛是岛上唯一的建筑。用战斗赚来的金币，决定这座岛接下来长成什么样。</span></div>');
+    html.push('<div class="build-list">');
+    for (var i = 0; i < D.UNLOCKS.length; i += 1) {
+      var u = D.UNLOCKS[i];
+      var owned = !!(s.unlocks && s.unlocks[u.id]);
+      var afford = s.coins >= u.cost;
+      var icon = UNLOCK_ICONS[u.id] || u.icon || 'star';
+      html.push('<article class="build-card' + (owned ? ' is-owned' : '') + (buildFocus === u.id ? ' is-focus' : '') + '">' +
+        '<span class="build-art">' + Art.icon(icon, owned ? '#8FC7A2' : '#E4C88C') + '</span>' +
+        '<div class="build-main"><strong>' + u.name + '</strong><p>' + u.desc + '</p>' +
+        '<span class="build-cost">' + (owned ? '已解锁' : ('<i class="coin-dot"></i>' + u.cost + ' 金币')) + '</span></div>' +
+        (owned
+          ? '<span class="build-state">' + Art.icon('check', '#8FC7A2') + '</span>'
+          : '<button type="button" class="btn tiny primary build-buy" data-action="unlock-build" data-unlock="' + u.id + '"' + (afford ? '' : ' disabled') + '>' + (afford ? '解锁' : '金币不足') + '</button>') +
+        '</article>');
+    }
+    html.push('</div>');
+    html.push('<div class="panel build-note"><div class="panel-title">建设顺序建议</div>' +
+      '<p>先解锁花园，草簇免费，可以马上把空岛铺出层次；再去祭坛赚金币，解锁杂货铺和小农田形成循环。高塔和装饰工坊适合中后期。</p></div>');
+    html.push('</div>');
+    shell.innerHTML = html.join('');
+    if (buildFocus) {
+      var focusEl = shell.querySelector('.build-card.is-focus');
+      if (focusEl && focusEl.scrollIntoView) {
+        setTimeout(function () { focusEl.scrollIntoView({ block: 'center' }); }, 60);
+      }
+    }
+  }
+
+  function showBuild(focusId) {
+    buildFocus = focusId || null;
+    show('build');
+  }
+
   /* ---------------- 页面切换与动作 ---------------- */
   function show(id) {
     if (currentScreen === 'world' && id !== 'world') window.World.leave();
@@ -1483,7 +1560,8 @@
     document.body.setAttribute('data-screen', id);
     renderHUD();
 
-    if (id === 'world') { window.World.enter(); maybeShowGuide(); }
+    if (id === 'world') { renderQuickDock(); window.World.enter(); maybeShowGuide(); }
+    else if (id === 'build') renderBuild();
     else if (id === 'prep') renderPrep();
     else if (id === 'result') renderResult();
  else if (id === 'bag') renderBag(bagTab);
@@ -1501,6 +1579,36 @@
 
     if (action === 'go-world' || action === 'go-island') {
       show('world');
+    } else if (action === 'go-build') {
+      showBuild();
+    } else if (action === 'unlock-build') {
+      var unlockId = el.getAttribute('data-unlock');
+      var result = Core.unlockBuilding(unlockId);
+      if (!result.ok) {
+        if (result.reason === 'coins') toast('金币不够，先去祭坛战斗赚金币');
+        else if (result.reason === 'owned') toast('这里已经建设好了');
+        else toast('暂时无法解锁');
+        return;
+      }
+      if (window.World && window.World.refreshBuildings) window.World.refreshBuildings();
+      renderHUD();
+      renderQuickDock();
+      renderBuild();
+      var unlockTips = {
+        garden: '点右侧「种植」开始种草',
+        shop: '杂货铺已经出现在东侧',
+        farm: '小农田已经出现在西侧',
+        deco: '点右侧「装饰」布置小岛',
+        house: '图鉴入口已经加入快捷栏',
+        tower: '高塔挑战已经加入快捷栏'
+      };
+      toast('已解锁「' + result.def.name + '」' + (unlockTips[unlockId] ? ' · ' + unlockTips[unlockId] : ''), 2600);
+    } else if (action === 'world-garden') {
+      if (!s.unlocks.garden) { showBuild('garden'); return; }
+      if (currentScreen !== 'world') show('world');
+      window.World.toggleGarden();
+    } else if (action === 'world-select-plant') {
+      window.World.selectPlant(el.getAttribute('data-plant'));
     } else if (action === 'go-battle') {
       if (s.towerBattle) {
         s.towerBattle = false;
@@ -1538,6 +1646,7 @@
       }
       show('world');
     } else if (action === 'go-farm') {
+      if (!s.unlocks.farm) { showBuild('farm'); return; }
       show('world');
       if (window.World && window.World.enterFarm) window.World.enterFarm();
     } else if (action === 'go-bag' || action === 'world-bag') {
@@ -1546,11 +1655,13 @@
     } else if (action === 'bag-back') {
       show(bagReturn === 'prep' ? 'prep' : (bagReturn === 'shop' ? 'shop' : 'world'));
     } else if (action === 'go-shop') {
+      if (!s.unlocks.shop) { showBuild('shop'); return; }
       if (currentScreen !== 'shop') shopReturn = currentScreen;
       show('shop');
     } else if (action === 'shop-back') {
       show(shopReturn === 'bag' ? 'bag' : (shopReturn === 'prep' ? 'prep' : 'world'));
     } else if (action === 'go-tower') {
+      if (!s.unlocks.tower) { showBuild('tower'); return; }
       show('tower');
     } else if (action === 'tower-start') {
       Core.startTower();
@@ -1571,14 +1682,17 @@
     } else if (action === 'wheel-skip') {
       skipWheel();
     } else if (action === 'go-collection' || action === 'world-collection') {
+      if (!s.unlocks.house) { showBuild('house'); return; }
       show('collection');
     } else if (action === 'collection-back') {
       show(collectionReturn === 'bag' ? 'bag' : 'world');
     } else if (action === 'world-interact') {
       window.World.interact();
     } else if (action === 'world-decorate') {
+      if (!s.unlocks.deco) { showBuild('deco'); return; }
       window.World.toggleDecorate();
     } else if (action === 'go-world-decorate') {
+      if (!s.unlocks.deco) { showBuild('deco'); return; }
       show('world');
       window.World.toggleDecorate();
     } else if (action === 'world-select-deco') {
@@ -1637,9 +1751,14 @@
     } else if (action === 'reset-save') {
       if (window.confirm('确定要重新开始吗？当前小岛的所有进度都会被清空。')) {
         Core.resetState();
+        if (window.World && window.World.refreshBuildings) window.World.refreshBuildings();
+        guideShown = false;
+        guideStep = 0;
+        buildFocus = null;
         bagTab = 'equip';
         collectionFilter = 'all';
         closeModal();
+        renderQuickDock();
         show('world');
         toast('新的小岛生活开始了');
       }
@@ -1713,12 +1832,15 @@
   function init() {
     document.addEventListener('click', onDocumentClick);
     decorateQuickButtons();
+    renderQuickDock();
     renderHUD();
   }
 
   window.UI = {
     init: init,
     show: show,
+    showBuild: showBuild,
+    renderQuickDock: renderQuickDock,
     toast: toast,
     renderHUD: renderHUD,
     showFarmDock: showFarmDock,
