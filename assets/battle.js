@@ -5,20 +5,43 @@
   var D = window.GAME_DATA;
   var C = D.CONFIG;
 
-  function rollDamage(atkPower, behind) {
-    var crit = Math.random() < 0.14;
-    var burst = !crit && behind && Math.random() < 0.1;
-    var variance = 0.78 + Math.random() * 0.5;
-    var dmg = atkPower * 0.235 * variance;
+  function pickAction(round, ownRatio, enemyRatio, advantage, energy) {
+    var nextEnergy = Math.min(100, energy + 25);
+    if (energy >= 100 && round >= 2) {
+      var chance = 0.70 + (advantage ? 0.08 : 0) + (enemyRatio < 0.30 ? 0.07 : 0) - (ownRatio < 0.25 ? 0.12 : 0);
+      chance = Math.max(0.45, Math.min(0.92, chance));
+      if (Math.random() < chance) return { action: 'skill', energy: 0, chance: chance };
+    }
+    return { action: 'normal', energy: nextEnergy, chance: 0 };
+  }
+
+  function rollDamage(atkPower, behind, action) {
+    var isSkill = action === 'skill';
+    var crit = Math.random() < (isSkill ? 0.16 : 0.12);
+    var burst = !crit && behind && Math.random() < (isSkill ? 0.14 : 0.08);
+    var variance = 0.80 + Math.random() * 0.44;
+    var factor = isSkill ? 0.38 : 0.17;
+    var dmg = atkPower * factor * variance;
     if (crit) dmg *= 1.75;
     if (burst) dmg *= 1.55;
     return { dmg: Math.max(1, Math.round(dmg)), crit: crit, burst: burst };
   }
 
-  function moveText(creature, roll) {
-    if (roll.crit) return '会心一击！' + creature.name + '的「' + creature.skill + '」造成 ' + roll.dmg + ' 点伤害';
-    if (roll.burst) return '背水一战！' + creature.name + '爆发「' + creature.skill + '」，造成 ' + roll.dmg + ' 点伤害';
-    return creature.name + '使出「' + creature.skill + '」，造成 ' + roll.dmg + ' 点伤害';
+  function moveText(creature, roll, action) {
+    var normal = action === 'normal';
+    if (roll.crit) {
+      return normal
+        ? '会心一击！' + creature.name + '的普通攻击造成 ' + roll.dmg + ' 点伤害'
+        : '会心一击！' + creature.name + '的「' + creature.skill + '」造成 ' + roll.dmg + ' 点伤害';
+    }
+    if (roll.burst) {
+      return normal
+        ? '背水一战！' + creature.name + '的普通攻击爆发，造成 ' + roll.dmg + ' 点伤害'
+        : '背水一战！' + creature.name + '爆发「' + creature.skill + '」，造成 ' + roll.dmg + ' 点伤害';
+    }
+    return normal
+      ? creature.name + ' 使用普通攻击，造成 ' + roll.dmg + ' 点伤害'
+      : creature.name + ' 使出「' + creature.skill + '」，造成 ' + roll.dmg + ' 点伤害';
   }
 
   function classify(win, pRatio, eRatio, playerPower, enemyPower) {
@@ -63,6 +86,10 @@
     var matchup = window.Core.elementMatchup(playerCreature.element, enemyCreature.element);
     var pMult = matchup.playerMult;
     var eMult = matchup.enemyMult;
+    var pEnergy = 0;
+    var eEnergy = 0;
+    var pAdvantage = !!matchup.playerAdvantage;
+    var eAdvantage = !matchup.neutral && !matchup.playerAdvantage;
 
     while (pHp > 0 && eHp > 0 && roundNo < 40) {
       roundNo += 1;
@@ -73,23 +100,31 @@
         if (pHp <= 0 || eHp <= 0) break;
         if (order[i] === 'p') {
           var pBehind = pHp / pMax < 0.35;
-          var pRoll = rollDamage(playerPower, pBehind);
+          var pAction = pickAction(roundNo, pHp / pMax, eHp / eMax, pAdvantage, pEnergy);
+          pEnergy = pAction.energy;
+          var pRoll = rollDamage(playerPower, pBehind, pAction.action);
           pRoll.dmg = Math.max(1, Math.round(pRoll.dmg * pMult));
           eHp = Math.max(0, eHp - pRoll.dmg);
           rounds.push({
-            side: 'p', dmg: pRoll.dmg, crit: pRoll.crit, burst: pRoll.burst,
+            side: 'p', action: pAction.action, skill: playerCreature.skill,
+            pEnergy: pEnergy, eEnergy: eEnergy,
+            dmg: pRoll.dmg, crit: pRoll.crit, burst: pRoll.burst,
             pHp: pHp, eHp: eHp, pMax: pMax, eMax: eMax, round: roundNo,
-            text: moveText(playerCreature, pRoll)
+            text: moveText(playerCreature, pRoll, pAction.action)
           });
         } else {
           var eBehind = eHp / eMax < 0.35;
-          var eRoll = rollDamage(enemyPower, eBehind);
+          var eAction = pickAction(roundNo, eHp / eMax, pHp / pMax, eAdvantage, eEnergy);
+          eEnergy = eAction.energy;
+          var eRoll = rollDamage(enemyPower, eBehind, eAction.action);
           eRoll.dmg = Math.max(1, Math.round(eRoll.dmg * eMult));
           pHp = Math.max(0, pHp - eRoll.dmg);
           rounds.push({
-            side: 'e', dmg: eRoll.dmg, crit: eRoll.crit, burst: eRoll.burst,
+            side: 'e', action: eAction.action, skill: enemyCreature.skill,
+            pEnergy: pEnergy, eEnergy: eEnergy,
+            dmg: eRoll.dmg, crit: eRoll.crit, burst: eRoll.burst,
             pHp: pHp, eHp: eHp, pMax: pMax, eMax: eMax, round: roundNo,
-            text: moveText(enemyCreature, eRoll)
+            text: moveText(enemyCreature, eRoll, eAction.action)
           });
         }
       }

@@ -718,28 +718,74 @@
 
     var treeAssets = ['tree1', 'tree2', 'tree3', 'round', 'round2', 'long', 'pine'];
     var bushAssets = ['bush1', 'bush3', 'bush4', 'hedge'];
+
+    function makeCenters(count, minDist, pathPad, buildingPad, spawnMin) {
+      var centers = [];
+      var tries = 0;
+      while (centers.length < count && tries < 900) {
+        tries += 1;
+        var cx2 = 2 + Math.floor(rand() * (COLS - 4));
+        var cy2 = 2 + Math.floor(rand() * (ROWS - 4));
+        if (tiles[cy2][cx2] !== 3) continue;
+        if (nearPath(cx2, cy2, pathPad) || nearBuilding(cx2, cy2, buildingPad)) continue;
+        if (dist2(cx2 + 0.5, cy2 + 0.5, W.spawn.x, W.spawn.y) < spawnMin * spawnMin) continue;
+        var ok = true;
+        for (var ci = 0; ci < centers.length; ci += 1) {
+          if (dist2(cx2, cy2, centers[ci].x, centers[ci].y) < minDist * minDist) { ok = false; break; }
+        }
+        if (ok) centers.push({ x: cx2, y: cy2 });
+      }
+      return centers;
+    }
+
+    function around(center, radius) {
+      return {
+        x: Math.round(center.x + (rand() * 2 - 1) * radius),
+        y: Math.round(center.y + (rand() * 2 - 1) * radius)
+      };
+    }
+
+    var groves = makeCenters(10, 7, 3, 2, 8);
+    var meadows = makeCenters(12, 5, 1, 1, 6);
+    var rockCenters = makeCenters(6, 9, 2, 2, 7);
     var treeCount = 0;
     var attempts = 0;
-    while (treeCount < 96 && attempts < 4400) {
+    while (treeCount < 96 && attempts < 6500 && groves.length) {
       attempts += 1;
-      var tx = Math.floor(rand() * COLS);
-      var ty = Math.floor(rand() * ROWS);
+      var grove = groves[Math.floor(rand() * groves.length)];
+      var tp = around(grove, 4);
+      var tx = tp.x;
+      var ty = tp.y;
       if (!canPlace(tx, ty)) continue;
       if (!farFromPlaced(tx, ty, 2.25)) continue;
       var asset;
-      if (nearPath(tx, ty, 2)) asset = 'palm';
-      else if (ty < 14) asset = rand() < 0.5 ? 'pine' : 'tree2';
+      if (ty < 14) asset = rand() < 0.55 ? 'pine' : 'tree2';
       else asset = treeAssets[Math.floor(rand() * treeAssets.length)];
       addScenery(asset, tx, ty, true, true);
       treeCount += 1;
     }
 
+    var palmCount = 0;
+    attempts = 0;
+    while (palmCount < 12 && attempts < 3200) {
+      attempts += 1;
+      var px = Math.floor(rand() * COLS);
+      var py = Math.floor(rand() * ROWS);
+      if (!canPlace(px, py)) continue;
+      if (!nearPath(px, py, 3)) continue;
+      if (!farFromPlaced(px, py, 1.8)) continue;
+      addScenery('palm', px, py, true, true);
+      palmCount += 1;
+    }
+
     var rockCount = 0;
     attempts = 0;
-    while (rockCount < 34 && attempts < 1600) {
+    while (rockCount < 34 && attempts < 2600 && rockCenters.length) {
       attempts += 1;
-      var rx2 = Math.floor(rand() * COLS);
-      var ry2 = Math.floor(rand() * ROWS);
+      var rc = rockCenters[Math.floor(rand() * rockCenters.length)];
+      var rp = around(rc, 2.6);
+      var rx2 = rp.x;
+      var ry2 = rp.y;
       if (!canPlace(rx2, ry2)) continue;
       if (!farFromPlaced(rx2, ry2, 1.3)) continue;
       addScenery('rock', rx2, ry2, true, true);
@@ -748,10 +794,12 @@
 
     var bushCount = 0;
     attempts = 0;
-    while (bushCount < 52 && attempts < 1400) {
+    while (bushCount < 52 && attempts < 2600 && groves.length) {
       attempts += 1;
-      var bx2 = Math.floor(rand() * COLS);
-      var by2 = Math.floor(rand() * ROWS);
+      var bg = groves[Math.floor(rand() * groves.length)];
+      var bp = around(bg, 5);
+      var bx2 = bp.x;
+      var by2 = bp.y;
       if (!canPlace(bx2, by2)) continue;
       if (!farFromPlaced(bx2, by2, 1.15)) continue;
       addScenery(bushAssets[Math.floor(rand() * bushAssets.length)], bx2, by2, true, true);
@@ -760,10 +808,12 @@
 
     var logCount = 0;
     attempts = 0;
-    while (logCount < 5 && attempts < 900) {
+    while (logCount < 5 && attempts < 1600 && groves.length) {
       attempts += 1;
-      var lx = Math.floor(rand() * COLS);
-      var ly = Math.floor(rand() * ROWS);
+      var lg = groves[Math.floor(rand() * groves.length)];
+      var lp = around(lg, 6);
+      var lx = lp.x;
+      var ly = lp.y;
       if (!canPlace(lx, ly)) continue;
       if (!farFromPlaced(lx, ly, 1.2)) continue;
       addScenery(logCount % 2 ? 'log' : 'stump', lx, ly, true, true);
@@ -774,8 +824,11 @@
     attempts = 0;
     while (flowerCount < 104 && attempts < 3200) {
       attempts += 1;
-      var fx = Math.floor(rand() * COLS);
-      var fy = Math.floor(rand() * ROWS);
+      var fp = (meadows.length && rand() < 0.72)
+        ? around(meadows[Math.floor(rand() * meadows.length)], 4)
+        : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
+      var fx = fp.x;
+      var fy = fp.y;
       if (!canPlaceSmall(fx, fy, 0)) continue;
       if (!farFromPlaced(fx, fy, 0.55)) continue;
       addScenery('flower', fx, fy, false, false);
@@ -786,8 +839,11 @@
     attempts = 0;
     while (grassCount < 560 && attempts < 9000) {
       attempts += 1;
-      var gx = Math.floor(rand() * COLS);
-      var gy = Math.floor(rand() * ROWS);
+      var gp = (meadows.length && rand() < 0.70)
+        ? around(meadows[Math.floor(rand() * meadows.length)], 4)
+        : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
+      var gx = gp.x;
+      var gy = gp.y;
       if (!canPlaceSmall(gx, gy, 0)) continue;
       if (!farFromPlaced(gx, gy, 0.5)) continue;
       addScenery('grass', gx, gy, false, false);
@@ -798,8 +854,10 @@
     attempts = 0;
     while (mushroomCount < 28 && attempts < 1200) {
       attempts += 1;
-      var mx = Math.floor(rand() * COLS);
-      var my = Math.floor(rand() * ROWS);
+      var mg = groves.length ? groves[Math.floor(rand() * groves.length)] : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
+      var mp = groves.length ? around(mg, 5) : mg;
+      var mx = mp.x;
+      var my = mp.y;
       if (!canPlaceSmall(mx, my, 0)) continue;
       if (!farFromPlaced(mx, my, 0.6)) continue;
       addScenery('mushroom', mx, my, false, false);
@@ -810,12 +868,40 @@
     attempts = 0;
     while (fernCount < 40 && attempts < 1600) {
       attempts += 1;
-      var fnx = Math.floor(rand() * COLS);
-      var fny = Math.floor(rand() * ROWS);
+      var fg = groves.length ? groves[Math.floor(rand() * groves.length)] : { x: Math.floor(rand() * COLS), y: Math.floor(rand() * ROWS) };
+      var fp2 = groves.length ? around(fg, 6) : fg;
+      var fnx = fp2.x;
+      var fny = fp2.y;
       if (!canPlaceSmall(fnx, fny, 0)) continue;
       if (!farFromPlaced(fnx, fny, 0.6)) continue;
       addScenery('fern', fnx, fny, false, false);
       fernCount += 1;
+    }
+
+    var fringeFlowers = 0;
+    attempts = 0;
+    while (fringeFlowers < 34 && attempts < 2400) {
+      attempts += 1;
+      var ffx = Math.floor(rand() * COLS);
+      var ffy = Math.floor(rand() * ROWS);
+      if (!nearPath(ffx, ffy, 2) || nearPath(ffx, ffy, 0)) continue;
+      if (!canPlaceSmall(ffx, ffy, 0)) continue;
+      if (!farFromPlaced(ffx, ffy, 0.55)) continue;
+      addScenery('flower', ffx, ffy, false, false);
+      fringeFlowers += 1;
+    }
+
+    var fringeGrass = 0;
+    attempts = 0;
+    while (fringeGrass < 90 && attempts < 4000) {
+      attempts += 1;
+      var ggx = Math.floor(rand() * COLS);
+      var ggy = Math.floor(rand() * ROWS);
+      if (!nearPath(ggx, ggy, 2) || nearPath(ggx, ggy, 0)) continue;
+      if (!canPlaceSmall(ggx, ggy, 0)) continue;
+      if (!farFromPlaced(ggx, ggy, 0.5)) continue;
+      addScenery('grass', ggx, ggy, false, false);
+      fringeGrass += 1;
     }
 
     var reedCount = 0;

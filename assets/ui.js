@@ -20,6 +20,14 @@
   var battleSettled = false;
   var farmTimer = null;
   var farmMatureFlags = [];
+  var guideStep = 0;
+  var guideShown = false;
+  var guideSteps = [
+    { art: 'rabbit', title: '欢迎来到变身岛', body: '你会随机变身为 34 种生物。每次战斗、种田和装饰都会让这座小岛更像你的家。' },
+    { art: 'fox', title: '先学会走路', body: '左下角摇杆或 WASD / 方向键移动，拖动画面旋转视角，点击地面会自动寻路。右下角的图标可以打开战斗、高塔、农田、背包、图鉴和装饰。' },
+    { art: 'tiger', title: '普通攻击与技能', body: '战斗会自动进行。普通攻击出现得更多，并积累气势；气势满后才会随机释放技能。胜利后转动战利品转盘，失败了也可以选择随机变身或保持形态。' },
+    { art: 'cow', title: '农田与整座岛', body: '走进农田，靠近田块会出现操作面板：种田、浇水、施肥、铲除；成熟后变成收获。肥料可以在杂货铺买到。' }
+  ];
   var farmDockTimer = null;
   var farmTargetIndex = -1;
   var farmSelectedCrop = 'carrot';
@@ -233,7 +241,7 @@
     }
     html.push('</div></div>');
 
-    html.push('<p class="battle-tip">战力不是全部：属性克制、会心一击和背水一战，都可能改写结果。</p>');
+    html.push('<p class="battle-tip">普通攻击会积累气势，气势满后随机释放技能；普通攻击出现得更多。属性克制、会心一击和背水一战都可能改写结果。</p>');
     html.push('</div></div>');
     html.push('<div class="screen-foot">' +
       '<button type="button" class="btn ghost" data-action="' + prepBack + '">' + Art.icon('back', '#C9C0B0') + (towerMode ? '返回高塔' : '返回小岛') + '</button>' +
@@ -261,13 +269,15 @@
       '<div class="battle-side side-p" id="side-p">' +
       '<div class="hp-box"><div class="hp-label"><span>' + elementBadge(p.element, false) + ' ' + p.name + '</span><b>' + battle.playerPower + '</b></div>' +
       '<div class="hp-bar"><i id="hp-p" style="width:100%"></i></div>' +
-      '<div class="hp-num" id="hp-p-num">' + sim.pMax + ' / ' + sim.pMax + '</div></div>' +
+      '<div class="hp-num" id="hp-p-num">' + sim.pMax + ' / ' + sim.pMax + '</div>' +
+      '<div class="skill-meter"><i id="skill-p" style="width:0%"></i></div></div>' +
       '<div class="battle-art">' + Art.creature(p.id) + '</div>' +
       '<div class="dmg-layer" id="dmg-p"></div></div>' +
       '<div class="battle-side side-e" id="side-e">' +
       '<div class="hp-box"><div class="hp-label"><span>' + elementBadge(e.element, false) + ' 野生' + e.name + '</span><b>' + battle.enemyPower + '</b></div>' +
       '<div class="hp-bar enemy"><i id="hp-e" style="width:100%"></i></div>' +
-      '<div class="hp-num" id="hp-e-num">' + sim.eMax + ' / ' + sim.eMax + '</div></div>' +
+      '<div class="hp-num" id="hp-e-num">' + sim.eMax + ' / ' + sim.eMax + '</div>' +
+      '<div class="skill-meter"><i id="skill-e" style="width:0%"></i></div></div>' +
       '<div class="battle-art">' + Art.creature(e.id) + '</div>' +
       '<div class="dmg-layer" id="dmg-e"></div></div>' +
       '<div class="vs-mark">VS</div>' +
@@ -332,20 +342,24 @@
   function applyRound(r) {
     setHp(r.pHp, r.pMax, r.eHp, r.eMax);
     setText('battle-round', '第 ' + r.round + ' 回合');
+    var pSkill = document.getElementById('skill-p');
+    var eSkill = document.getElementById('skill-e');
+    if (pSkill) pSkill.style.width = Math.max(0, Math.min(100, r.pEnergy || 0)) + '%';
+    if (eSkill) eSkill.style.width = Math.max(0, Math.min(100, r.eEnergy || 0)) + '%';
     var side = r.side === 'p' ? 'e' : 'p';
-    appendLog(r.text, r.side === 'p' ? 'side-p' : 'side-e');
+    var action = r.action || 'normal';
+    appendLog(r.text, (r.side === 'p' ? 'side-p' : 'side-e') + ' ' + action);
     if (r.dmg > 0) {
       showDamage(side, r.dmg, r.crit);
       animateSide(r.side);
       Core.haptic(r.crit ? 'heavy' : 'light');
-      if (r.crit || r.burst) {
-        var arena = document.getElementById('arena');
-        if (arena) {
-          arena.classList.add('is-crit');
-          setTimeout(function () {
-            arena.classList.remove('is-crit');
-          }, 380);
-        }
+      var arena = document.getElementById('arena');
+      if (arena && (r.crit || r.burst || action === 'skill')) {
+        arena.classList.add(action === 'skill' ? 'is-skill' : 'is-crit');
+        setTimeout(function () {
+          arena.classList.remove('is-skill');
+          arena.classList.remove('is-crit');
+        }, 420);
       }
     }
   }
@@ -1469,7 +1483,7 @@
     document.body.setAttribute('data-screen', id);
     renderHUD();
 
-    if (id === 'world') window.World.enter();
+    if (id === 'world') { window.World.enter(); maybeShowGuide(); }
     else if (id === 'prep') renderPrep();
     else if (id === 'result') renderResult();
  else if (id === 'bag') renderBag(bagTab);
@@ -1593,6 +1607,13 @@
       renderBag('equip');
       renderHUD();
       toast('已卸下装备');
+    } else if (action === 'guide-next') {
+      if (guideStep >= guideSteps.length - 1) finishGuide();
+      else { guideStep += 1; renderGuide(); }
+    } else if (action === 'guide-prev') {
+      if (guideStep > 0) { guideStep -= 1; renderGuide(); }
+    } else if (action === 'guide-skip' || action === 'guide-done') {
+      finishGuide();
     } else if (action === 'farm-leave') {
       if (window.World && window.World.leaveFarm) window.World.leaveFarm();
     } else if (action === 'farm-select-crop') {
@@ -1644,6 +1665,49 @@
       var color = ico.getAttribute('data-color') || '#DCD3C2';
       ico.innerHTML = Art.icon(name, color);
     }
+  }
+
+  function renderGuide() {
+    var step = guideSteps[guideStep];
+    var total = guideSteps.length;
+    var dots = '';
+    for (var i = 0; i < total; i += 1) {
+      dots += '<i class="' + (i === guideStep ? 'is-active' : '') + '"></i>';
+    }
+    var html = '<div class="modal-mask" data-action="guide-skip"></div><div class="modal-card guide-card">' +
+      '<div class="guide-head"><span class="guide-kicker">第一次上岛 · ' + (guideStep + 1) + ' / ' + total + '</span>' +
+      '<span class="guide-dots">' + dots + '</span></div>' +
+      '<div class="guide-art">' + Art.creature(step.art) + '</div>' +
+      '<h2>' + step.title + '</h2><p>' + step.body + '</p>' +
+      '<div class="guide-actions">' +
+      (guideStep > 0
+        ? '<button type="button" class="btn ghost" data-action="guide-prev">上一步</button>'
+        : '<button type="button" class="btn ghost" data-action="guide-skip">跳过</button>') +
+      '<button type="button" class="btn primary" data-action="' + (guideStep === total - 1 ? 'guide-done' : 'guide-next') + '">' +
+      (guideStep === total - 1 ? '开始冒险' : '下一步') + '</button></div></div>';
+    openModal(html);
+  }
+
+  function finishGuide() {
+    var s = state();
+    if (s) {
+      s.guideSeen = true;
+      Core.saveState();
+    }
+    closeModal();
+    toast('旅途愉快，先去看看小岛吧', 1800);
+  }
+
+  function maybeShowGuide() {
+    var s = state();
+    if (!s || s.guideSeen || guideShown) return;
+    guideShown = true;
+    setTimeout(function () {
+      if (currentScreen === 'world' && !state().guideSeen) {
+        guideStep = 0;
+        renderGuide();
+      }
+    }, 900);
   }
 
   function init() {

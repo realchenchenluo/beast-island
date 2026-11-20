@@ -132,6 +132,7 @@
       equipment: equipment,
       items: [],
       cards: cards,
+      guideSeen: false,
       decoBag: { palm: 1, flowers: 1 },
       worldDecos: worldDecos,
       plots: plots,
@@ -227,6 +228,7 @@
     s.slots = clamp(num(raw.slots, C.startSlots, C.startSlots, C.maxSlots), C.startSlots, C.maxSlots);
     s.boost = num(raw.boost, 0, 0, 99999);
     s.totalBattles = num(raw.totalBattles, 0, 0, 9999999);
+    s.guideSeen = !!raw.guideSeen;
     s.tower = {
       active: !!(raw.tower && raw.tower.active),
       floor: clamp(num(raw.tower && raw.tower.floor, 1, 1, D.TOWER.floors), 1, D.TOWER.floors),
